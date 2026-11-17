@@ -30,23 +30,42 @@ def canonical_report_question(question: str) -> str | None:
                  if q == intent.lower().rstrip('.')), None)
 
 
+def _window_bounds(intent: str) -> tuple[date, date]:
+    today = reference_date()
+    if intent == MONTHLY_EXPENSES:
+        # First day of the month 11 months before the current month, so the
+        # window is exactly 12 calendar months including the current month.
+        year, month_index = divmod(today.year * 12 + today.month - 1 - 11, 12)
+        start = date(year, month_index + 1, 1)
+    else:
+        year, month_index = divmod(today.year * 12 + today.month - 1 - 6, 12)
+        month = month_index + 1
+        start = date(year, month, min(today.day, monthrange(year, month)[1]))
+    return start, today + timedelta(days=1)
+
+
 def report_assumptions(question: str) -> list[str]:
     intent = canonical_report_question(question)
     if intent is None:
         return []
-    months = 6 if intent == CATEGORY_REVENUE else 12
-    assumptions = [
-        f'The period is a rolling {months}-calendar-month window through {reference_date()} '
-        '(Asia/Kolkata), including that date and excluding future records.'
-    ]
+    start, end = _window_bounds(intent)
+    today = end - timedelta(days=1)
     if intent == CATEGORY_REVENUE:
-        assumptions.append('Category revenue sums recorded sales line amounts, preferring net_amount, '
-                           'then total_amount, then line_total; invoice totals are not repeated per item. '
-                           'All recorded categories are ranked, with category as the tie-breaker.')
-    else:
-        assumptions.append('Expenses are summed by calendar month within that rolling window. '
-                           'Only months with recorded expense rows are shown; missing months are not assumed to be zero.')
-    return assumptions
+        return [
+            f'The period is a rolling 6-calendar-month window through {today} '
+            '(Asia/Kolkata), including that date and excluding future records.',
+            'Category revenue sums recorded sales line amounts, preferring net_amount, '
+            'then total_amount, then line_total; invoice totals are not repeated per item. '
+            'All recorded categories are ranked, with category as the tie-breaker.',
+        ]
+    return [
+        f'The period is the 12 calendar months from {start.isoformat()} through {today} '
+        '(Asia/Kolkata), including that date and excluding future records.',
+        'Expenses are summed by calendar month starting on the first day of the month '
+        '11 months before the current month, so the window covers exactly 12 calendar '
+        'months including the current month. Only months with recorded expense rows are '
+        'shown; missing months are not assumed to be zero.',
+    ]
 
 
 def report_sql(schema: str, question: str, *, dialect: str = 'sqlite') -> str | None:
@@ -65,12 +84,8 @@ def report_sql(schema: str, question: str, *, dialect: str = 'sqlite') -> str | 
         quote = '`' if dialect == 'mysql' else '"'
         return quote + identifier.replace(quote, quote * 2) + quote
 
-    today = reference_date()
-    months = 12 if intent == MONTHLY_EXPENSES else 6
-    year, month_index = divmod(today.year * 12 + today.month - 1 - months, 12)
-    month = month_index + 1
-    start = date(year, month, min(today.day, monthrange(year, month)[1])).isoformat()
-    end = (today + timedelta(days=1)).isoformat()
+    start, end = _window_bounds(intent)
+    start, end = start.isoformat(), end.isoformat()
 
     def day(column):
         return f'date({column})' if dialect == 'sqlite' else f'CAST({column} AS DATE)'

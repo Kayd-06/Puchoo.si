@@ -18,7 +18,7 @@ from typing import Any, Protocol
 from apps.core.rag import RAG_INSTRUCTIONS, model_request
 from apps.core.answer_policy import ANSWER_POLICY, planning_reference
 from apps.core.question_text import unquoted_question
-from apps.core.consistent_reports import canonical_report_question, report_sql
+from apps.core.consistent_reports import canonical_report_question
 from apps.core.token_usage import record_usage
 
 
@@ -610,9 +610,9 @@ def canonicalize_analytics_question(question: str) -> str:
 def schema_guided_fallback_sql(schema: str, question: str) -> str | None:
     """Build a deterministic query for high-risk analytics the small models miss."""
 
-    consistent_sql = report_sql(schema, question)
-    if consistent_sql:
-        return consistent_sql
+    # Canonical report SQL is built by report_sql with the workspace dialect.
+    if canonical_report_question(question):
+        return None
     q = " ".join(question.lower().split())
     latest_period_match = re.search(r"\b(?:latest|current)\s+(\d+)\s+days?\b", q)
     prior_period_match = re.search(r"\b(?:prior|previous)\s+(\d+)\s+days?\b", q)

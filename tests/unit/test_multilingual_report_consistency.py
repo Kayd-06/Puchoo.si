@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from apps.core.consistent_reports import report_assumptions, report_sql
 from apps.core.llm_client import canonicalize_analytics_question, schema_guided_fallback_sql
 from apps.core.sarvam_client import SarvamClient
 
@@ -32,7 +33,7 @@ EXPENSES = [
 
 @pytest.mark.parametrize('wordings', [REVENUE, EXPENSES])
 def test_equivalent_report_wordings_use_identical_sql(wordings):
-    queries = [schema_guided_fallback_sql(SCHEMA, canonicalize_analytics_question(q)) for q in wordings]
+    queries = [report_sql(SCHEMA, canonicalize_analytics_question(q)) for q in wordings]
     assert all(queries), 'Reported questions must have schema-grounded report SQL'
     assert len(set(queries)) == 1
 
@@ -50,8 +51,8 @@ def test_report_results_exclude_old_and_future_data_and_avoid_invoice_fanout():
         INSERT INTO expenses VALUES (1,date('now'),10),(2,date('now'),25),(3,'2000-01-01',500),(4,'2999-01-01',900);
     ''')
     try:
-        revenue = schema_guided_fallback_sql(SCHEMA, canonicalize_analytics_question(REVENUE[0]))
-        expenses = schema_guided_fallback_sql(SCHEMA, canonicalize_analytics_question(EXPENSES[0]))
+        revenue = report_sql(SCHEMA, canonicalize_analytics_question(REVENUE[0]))
+        expenses = report_sql(SCHEMA, canonicalize_analytics_question(EXPENSES[0]))
         assert revenue and expenses
         assert db.execute(revenue).fetchall() == [('B', 40.0), ('A', 30.0)]
         rows = db.execute(expenses).fetchall()
@@ -68,12 +69,13 @@ def test_report_results_exclude_old_and_future_data_and_avoid_invoice_fanout():
 ])
 def test_extra_filters_and_explicit_calendar_periods_are_not_rewritten(question):
     assert canonicalize_analytics_question(question) == question
+    assert report_sql(SCHEMA, question) is None
     assert schema_guided_fallback_sql(SCHEMA, question) is None
 
 
 def test_missing_line_revenue_does_not_substitute_repeated_invoice_totals():
     schema = SCHEMA.replace('line_total (REAL)', 'quantity (INTEGER)')
-    assert schema_guided_fallback_sql(schema, canonicalize_analytics_question(REVENUE[0])) is None
+    assert report_sql(schema, canonicalize_analytics_question(REVENUE[0])) is None
 
 
 def test_sarvam_sdk_errors_are_normalized_for_safe_router_handling():
@@ -119,3 +121,71 @@ def test_ambiguous_fact_tables_do_not_get_arbitrarily_selected():
     from apps.core.consistent_reports import report_sql
     schema = SCHEMA + '\n\nTable: archived_expenses\nColumns: expense_id (INTEGER), expense_date (TEXT), amount (REAL)'
     assert report_sql(schema, EXPENSES[0]) is None
+
+
+def test_schema_guided_fallback_defers_canonical_reports_to_dialect_aware_sql():
+    question = canonicalize_analytics_question(EXPENSES[0])
+    assert question and report_sql(SCHEMA, question)
+    assert schema_guided_fallback_sql(SCHEMA, question) is None
+
+
+def test_monthly_expenses_cover_exactly_twelve_calendar_months(monkeypatch):
+    from datetime import date
+    from apps.core import consistent_reports
+    monkeypatch.setattr(consistent_reports, 'reference_date', lambda: date(2026, 11, 18))
+    db = sqlite3.connect(':memory:')
+    db.executescript("""
+        CREATE TABLE expenses(expense_id INTEGER, expense_date TEXT, amount REAL);
+        INSERT INTO expenses VALUES
+          (1,'2025-11-30',100),
+          (2,'2025-12-01',10),
+          (3,'2026-01-15',20),
+          (4,'2026-02-01',30),
+          (5,'2026-03-31',40),
+          (6,'2026-04-01',50),
+          (7,'2026-05-20',60),
+          (8,'2026-06-30',70),
+          (9,'2026-07-01',80),
+          (10,'2026-08-15',90),
+          (11,'2026-09-01',100),
+          (12,'2026-10-31',110),
+          (13,'2026-11-18',120),
+          (14,'2026-11-19',200);
+    """)
+    try:
+        sql = report_sql(SCHEMA, EXPENSES[0])
+        rows = db.execute(sql).fetchall()
+        assert [row[0] for row in rows] == [
+            '2025-12', '2026-01', '2026-02', '2026-03', '2026-04', '2026-05',
+            '2026-06', '2026-07', '2026-08', '2026-09', '2026-10', '2026-11',
+        ]
+        assert len(rows) == 12
+        assert rows[0] == ('2025-12', 10.0)
+        assert rows[-1] == ('2026-11', 120.0)
+        assumptions = report_assumptions(EXPENSES[0])
+        assert '2025-12-01' in assumptions[0]
+        assert '2026-11-18' in assumptions[0]
+        assert 'exactly 12 calendar months' in assumptions[1]
+    finally:
+        db.close()
+
+
+@pytest.mark.parametrize('dialect,formatter', [
+    ('sqlite', "strftime('%Y-%m', e.expense_date)"),
+    ('postgres', "TO_CHAR(CAST(e.expense_date AS TIMESTAMP), 'YYYY-MM')"),
+    ('postgresql', "TO_CHAR(CAST(e.expense_date AS TIMESTAMP), 'YYYY-MM')"),
+    ('mysql', "DATE_FORMAT(e.expense_date, '%Y-%m')"),
+])
+def test_monthly_expense_sql_uses_full_calendar_month_bounds_for_each_dialect(monkeypatch, dialect, formatter):
+    from datetime import date
+    from apps.core import consistent_reports
+    monkeypatch.setattr(consistent_reports, 'reference_date', lambda: date(2026, 11, 18))
+    sql = report_sql(SCHEMA, EXPENSES[0], dialect=dialect)
+    assert sql is not None
+    assert formatter in sql
+    assert ">= '2025-12-01'" in sql
+    assert "< '2026-11-19'" in sql
+    assert "'-12 months'" not in sql
+    if dialect != 'sqlite':
+        assert 'strftime(' not in sql
+        assert 'CAST(e.expense_date AS DATE)' in sql
