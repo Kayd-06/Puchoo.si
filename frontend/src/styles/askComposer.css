@@ -316,12 +316,12 @@ html[data-theme='light'] #root .app-container .ask-page {
   padding: 18px;
   border: 1px solid var(--border-color, #49566b);
   border-radius: 12px;
-  color: inherit;
+  color: var(--text-primary);
 }
 .analysis-selector p {
   margin: 6px 0 12px;
   font-size: 13px;
-  opacity: 0.8;
+  color: var(--text-secondary, var(--text-muted));
 }
 .analysis-selector > div {
   display: flex;
@@ -344,13 +344,13 @@ html[data-theme='light'] #root .app-container .ask-page {
   cursor: pointer;
 }
 .analysis-selector button[aria-pressed='true'] {
-  border-color: #5599ed;
-  background: rgba(85, 153, 237, 0.13);
+  border-color: color-mix(in srgb, currentColor 60%, transparent);
+  background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .analysis-selector small {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  opacity: 0.8;
+  color: var(--text-secondary, var(--text-muted));
 }

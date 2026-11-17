@@ -128,3 +128,40 @@ it('exports a refetched localized record using saved labels and display rows', a
   expect(fetchApi).toHaveBeenCalledTimes(1);
   vi.restoreAllMocks();
 });
+
+it('shows per-query input, output, total and partial token usage while keeping old records readable', async () => {
+  fetchApi.mockReset();
+  fetchApi.mockResolvedValueOnce([
+    {
+      id: 'metered',
+      question: 'Revenue',
+      row_count: 2,
+      token_usage: {
+        status: 'complete',
+        input_tokens: 125,
+        output_tokens: 25,
+        total_tokens: 150,
+        calls: [
+          { model: 'sql-model', stage: 'generation', total_tokens: 120 },
+          { model: 'verifier-model', stage: 'verification', total_tokens: 30 },
+        ],
+      },
+    },
+    {
+      id: 'partial',
+      question: 'Expenses',
+      token_usage: { status: 'partial', total_tokens: null, reported_tokens: 40, calls: [] },
+    },
+    { id: 'legacy', question: 'Old query' },
+  ]);
+  render(<History />);
+  const card = (await screen.findByRole('heading', { name: 'Revenue' })).closest('article');
+  fireEvent.click(within(card).getByText('150 tokens'));
+  expect(within(card).getByText('Input: 125')).toBeInTheDocument();
+  expect(within(card).getByText('Output: 25')).toBeInTheDocument();
+  expect(within(card).getByText(/sql-model/)).toBeInTheDocument();
+  expect(screen.getByText('40 reported tokens · partial usage')).toBeInTheDocument();
+  const legacy = screen.getByRole('heading', { name: 'Old query' }).closest('article');
+  expect(within(legacy).getByText('Token usage unavailable')).toBeInTheDocument();
+  expect(within(legacy).queryByText('0 tokens')).not.toBeInTheDocument();
+});

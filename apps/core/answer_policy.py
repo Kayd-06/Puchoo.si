@@ -13,6 +13,8 @@ For routine analytics, choose the following conventions and disclose the actual 
   then line_total, using only fields that exist. Do not subtract a discount twice.
 - No period means all recorded data. Relative periods end at the server reference date;
   'last six months' is a rolling six-calendar-month window ending on that date.
+  'Last year' or 'past year' in a monthly expense report means the trailing twelve
+  months; an explicitly requested calendar year retains its calendar boundaries.
   Ordinary quarters/years are calendar periods unless a fiscal calendar is supplied.
   Do not ask the user for today's date. Preserve explicit dates and filters exactly.
 - Active customers: use the recorded active status when available; otherwise customers
@@ -43,5 +45,9 @@ silently override explicit user constraints, invent policy rules, or relax SQL s
 """
 
 
+def reference_date():
+    return datetime.now(ZoneInfo("Asia/Kolkata")).date()
+
+
 def planning_reference() -> str:
-    return "Server reference date: " + datetime.now(ZoneInfo("Asia/Kolkata")).date().isoformat() + " (Asia/Kolkata)."
+    return "Server reference date: " + reference_date().isoformat() + " (Asia/Kolkata)."

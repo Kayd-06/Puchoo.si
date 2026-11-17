@@ -27,6 +27,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
+import TokenUsage from '../components/TokenUsage';
 import { buildCsv, renderReportPdf } from '../utils/reportExport';
 import {
   saveBlob,
@@ -416,6 +417,7 @@ export default function History() {
                     </span>
                     {item.model_attempts > 1 && <span>{item.model_attempts} attempts</span>}
                   </div>
+                  <TokenUsage usage={item.token_usage} />
                 </div>
                 <div className="history-card-actions">
                   {!isViewer && (

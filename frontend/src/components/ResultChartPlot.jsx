@@ -24,15 +24,26 @@ import {
   ComposedChart,
   Brush,
 } from 'recharts';
+// Theme-aware data colors also resolve to concrete colors in SVG downloads.
 export const chartColors = [
-  '#5599ed',
-  '#31b7a0',
-  '#d294e8',
-  '#e3aa49',
-  '#ef7e88',
-  '#8996ed',
-  '#70b966',
-  '#d88e63',
+  'var(--chart-series-1, #0d9488)',
+  'var(--chart-series-2, #7c3aed)',
+  'var(--chart-series-3, #d97706)',
+  'var(--chart-series-4, #e11d48)',
+  'var(--chart-series-5, #2563eb)',
+  'var(--chart-series-6, #16a34a)',
+  'var(--chart-series-7, #db2777)',
+  'var(--chart-series-8, #ea580c)',
+];
+export const chartColorNames = [
+  'Teal',
+  'Violet',
+  'Amber',
+  'Rose',
+  'Blue',
+  'Green',
+  'Pink',
+  'Orange',
 ];
 export const formatChartNumber = (value) =>
   value == null
@@ -78,8 +89,8 @@ export default function ResultChartPlot({
     <Tooltip
       contentStyle={{
         background: 'var(--report-surface, #fff)',
-        color: 'var(--report-text, #27313d)',
-        border: '1px solid #888',
+        color: 'var(--report-text, #262626)',
+        border: '1px solid var(--report-line, #d4d4d4)',
         borderRadius: 8,
       }}
       formatter={(value, name) => [formatChartNumber(value), name]}

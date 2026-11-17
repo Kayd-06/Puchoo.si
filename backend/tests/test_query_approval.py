@@ -1254,3 +1254,138 @@ def test_failed_multi_question_message_suggests_splitting(env):
     assert response.status_code == 400
     assert 'separate questions' in response.json()['detail']
     assert env.executions == []
+
+
+@pytest.mark.parametrize('question,translated,source', [
+    ('Which product categories generated the most revenue in the last six months?',
+     'Which product categories generated the highest revenue over the past 6 months?',
+     'पिछले छह महीनों में किन उत्पाद श्रेणियों से सबसे अधिक राजस्व मिला?'),
+    ('For each month in the last year, what was the total recorded expense?',
+     'What were the total recorded expenses for each month in the past year?',
+     'पिछले साल हर महीने कुल दर्ज खर्च कितना था?'),
+])
+def test_reported_questions_keep_sql_and_results_across_languages(env, monkeypatch, question, translated, source):
+    from apps.core.llm_client import schema_guided_fallback_sql
+    connection = sqlite3.connect(env.source)
+    connection.executescript("""
+        CREATE TABLE products(product_id INTEGER PRIMARY KEY, category TEXT);
+        CREATE TABLE invoices(invoice_id INTEGER PRIMARY KEY, invoice_date TEXT, total_amount REAL);
+        CREATE TABLE invoice_items(invoice_id INTEGER, product_id INTEGER, line_total REAL);
+        CREATE TABLE expenses(expense_id INTEGER PRIMARY KEY, expense_date TEXT, amount REAL);
+        INSERT INTO products VALUES(1,'Clothes'),(2,'Books');
+        INSERT INTO invoices VALUES(1,date('now'),300);
+        INSERT INTO invoice_items VALUES(1,1,100),(1,2,200);
+        INSERT INTO expenses VALUES(1,date('now'),15),(2,date('now'),20);
+    """)
+    connection.close()
+    monkeypatch.setattr(query_router, 'schema_guided_fallback_sql', schema_guided_fallback_sql)
+    monkeypatch.setattr(query_router, 'get_sql_client', lambda: pytest.fail('These reports must not depend on model generation'))
+    class Translation:
+        def translate(self, text, target_language, **kwargs):
+            return translated if target_language == 'en-IN' else text
+        def translate_many(self, texts, *args, **kwargs):
+            return {text: text for text in texts}
+    monkeypatch.setattr(query_router, 'SarvamClient', Translation)
+    english = env.generate(question=question)
+    regional = env.owner.post(f'/api/query/{WORKSPACE_ID}/generate',
+                              json={'question': source, 'language_code': 'hi-IN'},
+                              headers=csrf_headers(env.owner))
+    assert english.status_code == regional.status_code == 200, (english.text, regional.text)
+    assert english.json()['sql'] == regional.json()['sql']
+    assert english.json()['assumptions']
+    first = env.approve(english.json())
+    second = env.approve(regional.json())
+    assert first.status_code == second.status_code == 200, (first.text, second.text)
+    assert first.json()['record']['rows'] == second.json()['record']['rows']
+    assert first.json()['record']['row_count'] > 0
+
+
+def test_sdk_translation_outage_preserves_answer_without_crashing(env, monkeypatch):
+    from types import SimpleNamespace
+    from sarvamai.core.api_error import ApiError
+    from apps.core.sarvam_client import SarvamClient
+    pending = env.generate().json()
+    def fail(**kwargs):
+        raise ApiError(status_code=429, body='private translation provider details')
+    adapter = SarvamClient(client=SimpleNamespace(text=SimpleNamespace(translate=fail)))
+    monkeypatch.setattr(query_router, 'SarvamClient', lambda: adapter)
+    monkeypatch.setattr(query_router, '_spoken_language', lambda code: 'hi-IN')
+    monkeypatch.setattr(query_router, '_translation_cache', {})
+    response = env.approve(pending)
+    assert response.status_code == 200, response.text
+    assert response.json()['presentation']['translation_unavailable'] is True
+    assert response.json()['record']['rows'] == [{'region': 'north', 'total': 15}, {'region': 'south', 'total': 20}]
+    assert 'private translation provider details' not in response.text
+    assert len(env.executions) == 1
+    assert env.approve(pending).status_code == 409
+
+
+def test_token_usage_accumulates_generation_and_verification_in_history_without_cross_query_leakage(env, monkeypatch):
+    from apps.core.token_usage import record_usage
+    env.fake.usage_calls = []
+    record_usage(env.fake, {'prompt_tokens': 999, 'completion_tokens': 999}, provider='deepseek', model='old-query')
+    original = env.fake.generate_sql
+    def generate(**kwargs):
+        record_usage(env.fake, {'prompt_tokens': 100, 'completion_tokens': 20}, provider='deepseek', model='sql-model')
+        return original(**kwargs)
+    monkeypatch.setattr(env.fake, 'generate_sql', generate)
+    class MeteredVerifier(FakeVerifier):
+        def __init__(self):
+            self.usage_calls = []
+        def verify(self, **kwargs):
+            record_usage(self, {'prompt_tokens': 25, 'completion_tokens': 5}, provider='anthropic', model='verification-model')
+            return super().verify(**kwargs)
+    monkeypatch.setattr(query_router, 'get_verifier', MeteredVerifier)
+    for _ in range(2):
+        pending = env.generate().json()
+        assert pending['token_usage']['total_tokens'] == 120
+        approved = env.approve(pending)
+        assert approved.status_code == 200, approved.text
+        usage = approved.json()['record']['token_usage']
+        assert usage['total_tokens'] == 150
+        assert usage['input_tokens'] == 125
+        assert usage['output_tokens'] == 25
+        assert [call['stage'] for call in usage['calls']] == ['generation', 'verification']
+    history = env.owner.get(f'/api/history/{WORKSPACE_ID}').json()
+    assert len(history) == 2
+    assert all(record['token_usage']['total_tokens'] == 150 for record in history)
+
+
+def test_runtime_repair_adds_usage_once_to_the_original_query(env, monkeypatch):
+    from apps.core.token_usage import record_usage
+    env.fake.sql = 'SELECT ABS(-9223372036854775808) AS size FROM orders'
+    env.fake.repair_sql = 'SELECT ABS(CAST(-9223372036854775808 AS REAL)) AS size FROM orders'
+    env.fake.usage_calls = []
+    generate = env.fake.generate_sql
+    def metered(**kwargs):
+        record_usage(env.fake, {'prompt_tokens': 10, 'completion_tokens': 5}, provider='deepseek', model='test-model')
+        return generate(**kwargs)
+    monkeypatch.setattr(env.fake, 'generate_sql', metered)
+    pending = env.generate().json()
+    assert pending['token_usage']['total_tokens'] == 15
+    monkeypatch.setattr(query_router, 'LocalMLXSQLClient', FakeSQLClient)
+    repair = env.approve(pending).json()['proposal']
+    assert repair['token_usage']['total_tokens'] == 30
+    approved = env.approve(repair)
+    assert approved.status_code == 200, approved.text
+    usage = approved.json()['record']['token_usage']
+    # The unmetered fixture verifier is unknown, never an invented zero.
+    assert usage['status'] == 'partial'
+    assert usage['reported_tokens'] == 30
+    assert [call['stage'] for call in usage['calls']] == ['generation', 'repair', 'verification']
+    assert env.approve(repair).status_code == 409
+
+
+def test_blocked_query_keeps_the_tokens_used_to_generate_it(env, monkeypatch):
+    from apps.core.token_usage import record_usage
+    env.fake.usage_calls = []
+    def blocked_sql(**kwargs):
+        record_usage(env.fake, {'prompt_tokens': 10, 'completion_tokens': 3}, provider='deepseek', model='test-model')
+        return 'DELETE FROM orders'
+    monkeypatch.setattr(env.fake, 'generate_sql', blocked_sql)
+    response = env.generate()
+    assert response.status_code == 403, response.text
+    history = env.owner.get(f'/api/history/{WORKSPACE_ID}').json()
+    assert history[0]['status'] == 'blocked'
+    assert history[0]['token_usage']['total_tokens'] == 13
+    assert env.executions == []

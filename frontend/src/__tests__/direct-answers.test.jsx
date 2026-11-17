@@ -104,7 +104,9 @@ it('jumps to the chart and does not scroll back when chart settings change', asy
   scroll.mockClear();
   fireEvent.click(jump);
   expect(scroll).toHaveBeenCalledTimes(1);
-  const color = await screen.findByRole('button', { name: 'Chart color Teal' });
+  const [settings] = await screen.findAllByRole('button', { name: 'Advanced settings' });
+  fireEvent.click(settings);
+  const color = screen.getByRole('button', { name: 'Chart color Violet' });
   fireEvent.click(color);
   await new Promise((resolve) => setTimeout(resolve, 150));
   expect(scroll).toHaveBeenCalledTimes(1);
@@ -211,4 +213,22 @@ it('hides Jump to chart when the result has nothing plottable', async () => {
   fireEvent.click(screen.getByRole('button', { name: 'Run secure query' }));
   expect(await screen.findByText('Download CSV', { exact: false })).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: 'Jump to chart' })).not.toBeInTheDocument();
+});
+
+it('shows the analysis selector in the typed question language and switches answers', async () => {
+  fetchApi.mockReset();
+  fetchApi
+    .mockResolvedValueOnce({ status: 'answer_unavailable', message: 'पहला उत्तर' })
+    .mockResolvedValueOnce({ status: 'answer_unavailable', message: 'दूसरा उत्तर' });
+  page();
+  fireEvent.change(screen.getByRole('textbox'), {
+    target: { value: 'कुल बिक्री कितनी है? हर महीने खर्च कितना था?' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Run secure query' }));
+  expect(await screen.findByText('2 विश्लेषण')).toBeInTheDocument();
+  expect(screen.getByText('उत्तर देखने के लिए कोई विश्लेषण चुनें।')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /विश्लेषण 2/ }));
+  expect(screen.getByText('दूसरा उत्तर')).toBeInTheDocument();
+  const submitted = fetchApi.mock.calls.map(([, options]) => JSON.parse(options.body).question);
+  expect(submitted).toEqual(['कुल बिक्री कितनी है?', 'हर महीने खर्च कितना था?']);
 });

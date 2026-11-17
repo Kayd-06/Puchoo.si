@@ -18,6 +18,8 @@ from typing import Any, Protocol
 from apps.core.rag import RAG_INSTRUCTIONS, model_request
 from apps.core.answer_policy import ANSWER_POLICY, planning_reference
 from apps.core.question_text import unquoted_question
+from apps.core.consistent_reports import canonical_report_question
+from apps.core.token_usage import record_usage
 
 
 DEFAULT_SQL_MODEL = "claude-sonnet-5"
@@ -568,6 +570,9 @@ def canonicalize_analytics_question(question: str) -> str:
     """
 
     normalized = re.sub(r"\s+", " ", question).strip()
+    report = canonical_report_question(normalized)
+    if report:
+        return report
     q = normalized.lower()
     # Ordinary unpaid-fee wording shares the outstanding-balance definition.
     # Full-sentence matching preserves explicit class, date, and payment filters.
@@ -605,6 +610,9 @@ def canonicalize_analytics_question(question: str) -> str:
 def schema_guided_fallback_sql(schema: str, question: str) -> str | None:
     """Build a deterministic query for high-risk analytics the small models miss."""
 
+    # Canonical report SQL is built by report_sql with the workspace dialect.
+    if canonical_report_question(question):
+        return None
     q = " ".join(question.lower().split())
     latest_period_match = re.search(r"\b(?:latest|current)\s+(\d+)\s+days?\b", q)
     prior_period_match = re.search(r"\b(?:prior|previous)\s+(\d+)\s+days?\b", q)
@@ -1005,6 +1013,7 @@ class LLMClient:
                 pass
         self.model = model or os.getenv("ANTHROPIC_SQL_MODEL", DEFAULT_SQL_MODEL)
         self.max_tokens = max_tokens
+        self.usage_calls = []
         if client is not None:
             self._client = client
             return
@@ -1026,6 +1035,7 @@ class LLMClient:
 
     def generate_sql(self, *, schema: str, question: str) -> str:
         prompt = self.build_prompt(schema, question)
+        usage_recorded = False
         try:
             response = self._client.messages.create(
                 model=self.model,
@@ -1033,10 +1043,16 @@ class LLMClient:
                 system=prompt.system,
                 messages=prompt.messages,
             )
+            record_usage(self, getattr(response, "usage", None), provider="anthropic", model=self.model)
+            usage_recorded = True
             content = response.content[0].text
         except (AttributeError, IndexError, KeyError, TypeError) as exc:
+            if not usage_recorded:
+                record_usage(self, None, provider="anthropic", model=self.model)
             raise SQLGenerationError("Claude returned a response with no text content.") from exc
         except Exception as exc:
+            if not usage_recorded:
+                record_usage(self, None, provider="anthropic", model=self.model)
             raise SQLGenerationError("Claude SQL-generation request failed.") from exc
         return _extract_sql(content)
 
@@ -1077,6 +1093,7 @@ class LocalMLXSQLClient:
             requested_max_tokens = DEFAULT_LOCAL_SQL_MAX_TOKENS
         self.max_tokens = max(128, min(requested_max_tokens, 1_024))
         self.timeout_seconds = timeout_seconds
+        self.usage_calls = []
 
     def _chat(self, *, system: str, user: str, max_tokens: int | None = None) -> str:
         payload = json.dumps({
@@ -1094,11 +1111,16 @@ class LocalMLXSQLClient:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
+        usage_recorded = False
         try:
             with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                 parsed = json.loads(response.read().decode("utf-8"))
+            record_usage(self, parsed.get("usage") if isinstance(parsed, dict) else None, provider="local", model=self.model)
+            usage_recorded = True
             return str(parsed["choices"][0]["message"]["content"])
         except (urllib.error.URLError, TimeoutError, KeyError, IndexError, TypeError, ValueError) as exc:
+            if not usage_recorded:
+                record_usage(self, None, provider="local", model=self.model)
             raise LocalMLXConfigurationError(
                 "The local SQL model is unavailable. Start the Qwen chat server and try again."
             ) from exc
@@ -1175,6 +1197,7 @@ class DeepSeekSQLClient(LocalMLXSQLClient):
         except ValueError:
             requested_max_tokens = 1800
         self.max_tokens = max(256, min(requested_max_tokens, 2_048))
+        self.usage_calls = []
         self.timeout_seconds = timeout_seconds
         self.request_style = "chat"
 
@@ -1202,9 +1225,12 @@ class DeepSeekSQLClient(LocalMLXSQLClient):
             method="POST",
         )
         for attempt in range(2):
+            usage_recorded = False
             try:
                 with urllib.request.urlopen(request, timeout=self.timeout_seconds) as response:
                     parsed = json.loads(response.read().decode("utf-8"))
+                record_usage(self, parsed.get("usage") if isinstance(parsed, dict) else None, provider="deepseek", model=selected_model)
+                usage_recorded = True
                 choice = parsed["choices"][0]
                 if choice.get("finish_reason") == "length":
                     raise SQLGenerationError("The SQL model response was incomplete; no partial query will be used.")
@@ -1213,6 +1239,7 @@ class DeepSeekSQLClient(LocalMLXSQLClient):
                     raise SQLGenerationError("The SQL model returned no answer.")
                 return content
             except urllib.error.HTTPError as exc:
+                record_usage(self, None, provider="deepseek", model=selected_model)
                 # Never retain provider messages: they can echo schema, prompts,
                 # or generated SQL. Only a known, fixed error category is safe.
                 known_codes = {"json_validate_failed", "structured_generation_failed",
@@ -1238,6 +1265,8 @@ class DeepSeekSQLClient(LocalMLXSQLClient):
                 failure.provider_error_code = provider_code
                 raise failure from exc
             except (urllib.error.URLError, TimeoutError, KeyError, IndexError, TypeError, ValueError) as exc:
+                if not usage_recorded:
+                    record_usage(self, None, provider="deepseek", model=selected_model)
                 raise LocalMLXConfigurationError("DeepSeek is unavailable or returned an invalid response. Please retry.") from exc
 
     def generate_plan(self, *, schema: str, question: str) -> str:

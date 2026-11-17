@@ -1,6 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
-import ResultCharts from '../ResultCharts';
+import ResultCharts from '../ResultChartCard';
 vi.mock('recharts', async (importOriginal) => {
   const actual = await importOriginal();
   const { cloneElement } = await import('react');
@@ -190,19 +190,21 @@ it('updates the actual chart and metric label when switching to row count and ba
 it('changes chart colors and preserves the choice when another setting changes', () => {
   const save = vi.fn();
   const { container } = render(<ResultCharts record={record} onConfigChange={save} />);
-  fireEvent.click(screen.getByRole('button', { name: 'Chart color Teal' }));
-  expect(screen.getByRole('button', { name: 'Chart color Teal' })).toHaveAttribute(
+  fireEvent.click(screen.getByRole('button', { name: 'Advanced settings' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Chart color Violet' }));
+  expect(screen.getByRole('button', { name: 'Chart color Violet' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );
   expect(container.querySelector('.recharts-bar-rectangle path')).toHaveAttribute(
     'fill',
-    '#31b7a0',
+    'var(--chart-series-2, #7c3aed)',
   );
   fireEvent.change(screen.getByLabelText('Chart type'), { target: { value: 'donut' } });
   expect(save.mock.lastCall[0].colorIndex).toBe(1);
   fireEvent.click(screen.getByRole('button', { name: 'Reset chart' }));
-  expect(screen.getByRole('button', { name: 'Chart color Blue' })).toHaveAttribute(
+  fireEvent.click(screen.getByRole('button', { name: 'Advanced settings' }));
+  expect(screen.getByRole('button', { name: 'Chart color Teal' })).toHaveAttribute(
     'aria-pressed',
     'true',
   );

@@ -7,6 +7,7 @@ import os
 from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any, Protocol
+from apps.core.token_usage import record_usage
 
 
 class VerificationStatus(str, Enum):
@@ -86,6 +87,7 @@ class ClaudeVerifier:
             except ImportError:
                 pass
         self.model = model or os.getenv("ANTHROPIC_VERIFIER_MODEL", "claude-haiku-4-5-20251001")
+        self.usage_calls = []
         if client is not None:
             self._client = client
             return
@@ -111,6 +113,7 @@ class ClaudeVerifier:
                 system=VERIFY_SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": payload}],
             )
+            record_usage(self, getattr(response, "usage", None), provider="anthropic", model=self.model)
             return _verification_from_content(response.content[0].text)
         except Exception:
             return verification_unavailable()
@@ -118,6 +121,10 @@ class ClaudeVerifier:
 
 class DeepSeekVerifier:
     """DeepSeek fallback for post-execution verification when Anthropic is not configured."""
+
+    @property
+    def usage_calls(self):
+        return getattr(self._client, "usage_calls", [])
 
     def __init__(self, *, model: str | None = None, client: DeepSeekClient | None = None) -> None:
         try:
