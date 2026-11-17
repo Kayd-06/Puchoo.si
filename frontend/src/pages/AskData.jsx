@@ -1,4 +1,5 @@
 import { splitAnalyses } from '../utils/splitAnalyses';
+import { analysisLabels } from '../utils/analysisLanguage';
 import { chartExportData } from '../utils/resultCharts';
 import { universePolicy } from '../utils/universePolicy';
 import '../styles/askComposer.css';
@@ -706,6 +707,10 @@ export default function AskData() {
   const [error, setError] = useState('');
   const [analysisState, setAnalysisState] = useState({ identity, items: [] });
   const analyses = analysisState.identity === identity ? analysisState.items : [];
+  const analysisCopy = analysisLabels(
+    analyses.map((item) => item.question).join(' '),
+    analyses[0]?.languageCode,
+  );
   const setAnalyses = (next) =>
     setAnalysisState((previous) => ({
       identity,
@@ -890,13 +895,14 @@ export default function AskData() {
           try {
             const outcome = await runAnalysisPart(query, [], token);
             if (!outcome) return;
-            items.push({ question: part, query, ...outcome });
+            items.push({ question: part, query, languageCode: questionLanguage, ...outcome });
           } catch (partError) {
             // Session, permission, safety and service errors stop the whole run.
             if (STOP_ANALYSIS_STATUSES.has(partError.status)) throw partError;
             items.push({
               question: part,
               query,
+              languageCode: questionLanguage,
               notice: {
                 status: 'answer_unavailable',
                 message: partError.message || 'This analysis could not be completed.',
@@ -1494,9 +1500,15 @@ export default function AskData() {
           )}
 
           {analyses.length > 1 && (
-            <section className="analysis-selector" aria-label="Separate analyses">
-              <strong>{analyses.length} analyses</strong>
-              <p>Choose an analysis to view its answer.</p>
+            <section
+              className="analysis-selector"
+              aria-label={analysisCopy.region}
+              dir={analysisCopy.direction}
+            >
+              <strong>
+                {analyses.length} {analysisCopy.plural}
+              </strong>
+              <p>{analysisCopy.instruction}</p>
               <div>
                 {analyses.map((item, index) => (
                   <button
@@ -1509,8 +1521,10 @@ export default function AskData() {
                       setClarification(item.notice || null);
                     }}
                   >
-                    <span>Analysis {index + 1}</span>
-                    <small>{item.question}</small>
+                    <span>
+                      {analysisCopy.singular} {index + 1}
+                    </span>
+                    <small dir="auto">{item.question}</small>
                   </button>
                 ))}
               </div>

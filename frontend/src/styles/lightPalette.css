@@ -7,6 +7,7 @@ html[data-theme='light'] {
   --bg-primary: #3f5f86;
   --bg-primary-hover: #344f70;
   --text-primary: #27313d;
+  --text-secondary: #566270;
   --text-muted: #566270;
   --text-on-primary: #ffffff;
   --border-color: #cdd3db;

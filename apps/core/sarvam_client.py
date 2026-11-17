@@ -96,12 +96,18 @@ class SarvamClient:
             raise ValueError("Text is required for translation.")
         if len(text) > MAX_TRANSLATION_CHARS:
             raise ValueError(f"Translation supports at most {MAX_TRANSLATION_CHARS} characters; shorten the complete text.")
+        # SDK HTTP failures use ApiError rather than httpx.HTTPError. Keep
+        # the SDK optional for English-only use and injected local clients.
+        try:
+            from sarvamai.core.api_error import ApiError
+        except ImportError:
+            ApiError = HTTPError
         try:
             response = self._client.text.translate(
                 input=text, source_language_code=source_language, target_language_code=target_language,
                 model=self.translation_model,
             )
-        except HTTPError as exc:
+        except (HTTPError, ApiError) as exc:
             raise RuntimeError("Translation service is unavailable. Please try again.") from exc
         return _value(response, "translated_text")
 

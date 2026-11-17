@@ -13,6 +13,8 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
 from apps.core.executor import QueryExecutionError, QueryTimeoutError, ReadOnlyExecutor
+from apps.core.consistent_reports import canonical_report_question, report_assumptions, report_sql
+from apps.core.token_usage import client_calls, previous_calls, summarize_calls, usage_offset
 from apps.core.guardrails import SQLGuardrailError, SQLParseError
 from apps.core.llm_client import (
     AnthropicConfigurationError,
@@ -292,6 +294,8 @@ def generate_query(
         raise HTTPException(status_code=400, detail="The question could not be processed.") from None
 
     controls = session_manager.get_guardrails(workspace_id)
+    client = None
+    generation_usage_start = 0
 
     try:
         schema = session_manager.get_schema(workspace_id) or get_schema_snapshot(
@@ -329,9 +333,14 @@ def generate_query(
                 **({"scope_warning": scope_warning} if scope_warning else {}),
                 **clarification,
             }
-        deterministic_sql = schema_guided_fallback_sql(schema, planning_question)
+        deterministic_sql = (
+            report_sql(schema, planning_question, dialect=workspace.get("dialect", "sqlite"))
+            if canonical_report_question(planning_question)
+            else schema_guided_fallback_sql(schema, planning_question)
+        )
         decision = classify_complexity(planning_question, schema)
         client = None if deterministic_sql else get_sql_client()
+        generation_usage_start = usage_offset(client)
         retrieved_context = []
         if not deterministic_sql:
             try:
@@ -351,6 +360,7 @@ def generate_query(
             selected_tables = [name for name in selected_tables if name in {table.name for table in parse_schema(schema)}]
             intent_plan.tables = selected_tables
             public_plan = intent_plan.as_dict()
+            public_plan["assumptions"] = report_assumptions(planning_question)
             if "outstanding_fee_amount" in deterministic_sql:
                 public_plan["assumptions"] = [
                     "Unpaid fees means a positive outstanding balance, including partial payments, "
@@ -492,6 +502,7 @@ def generate_query(
             "limit": guarded.limit,
             "created_at": utc_now(),
             "model_attempts": attempt,
+            "token_usage": summarize_calls(client_calls(client, generation_usage_start, "generation")),
             "generation_method": "schema-guided fallback" if attempt == 0 or attempt > max_attempts else getattr(client, "provider_name", "local model"),
             "intent_plan": public_plan,
             "route": decision.route,
@@ -534,6 +545,7 @@ def generate_query(
             "id": f"qry_{uuid4().hex[:12]}", "workspace_id": workspace_id, "question": question,
             "language_code": language_code,
             "sql": "", "status": "blocked", "created_at": utc_now(), "row_count": 0, "rows": [], "elapsed_ms": 0,
+            "token_usage": summarize_calls(client_calls(client, generation_usage_start, "generation")),
             "verification": {"status": "BLOCKED", "summary": "Blocked before execution.", "details": "The query did not pass the safety policy."},
         }
         session_manager.append_history(workspace_id, blocked_record)
@@ -598,6 +610,7 @@ def _repair_proposal(
     """
 
     client = get_sql_client()
+    repair_usage_start = usage_offset(client)
     if not isinstance(client, LocalMLXSQLClient):
         return None
     schema = session_manager.get_schema(workspace_id) or get_schema_snapshot(
@@ -633,6 +646,7 @@ def _repair_proposal(
         "sql": guarded_repair.sql,
         "limit": guarded_repair.limit,
         "model_attempts": int(context.get("model_attempts", 1)) + 1,
+        "token_usage": summarize_calls(previous_calls(context.get("token_usage")) + client_calls(client, repair_usage_start, "repair")),
         "status": "repair_pending_approval",
     }
     repair_trace = dict(context.get("pipeline_trace", {}))
@@ -711,8 +725,12 @@ def approve_pending_query(
         # The SQL has already run, so the pending approval must be closed even
         # if verification fails unexpectedly; otherwise it could be replayed.
         try:
+            verifier = None
+            verification_usage_start = 0
             try:
-                verification = get_verifier().verify(
+                verifier = get_verifier()
+                verification_usage_start = usage_offset(verifier)
+                verification = verifier.verify(
                     question=proposal.get("processing_question", proposal["question"]),
                     sql=result.sql,
                     columns=result.columns,
@@ -746,6 +764,7 @@ def approve_pending_query(
             "columns": result.columns,
             "elapsed_ms": result.elapsed_ms,
             "verification": verification_dict,
+            "token_usage": summarize_calls(previous_calls(proposal.get("token_usage")) + client_calls(verifier, verification_usage_start, "verification")),
             "executed_at": utc_now(),
         }
 

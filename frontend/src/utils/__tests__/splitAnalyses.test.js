@@ -47,3 +47,42 @@ it('keeps questions that open with "their" or continue with "or" attached', () =
   expect(splitAnalyses('Is revenue up this month? Or is it flat?')).toHaveLength(1);
   expect(splitAnalyses('Show monthly revenue? or by quarter?')).toHaveLength(1);
 });
+
+it.each([
+  ['कुल बिक्री कितनी है?', 'हर महीने खर्च कितना था?'],
+  ['মোট বিক্রয় কত?', 'প্রতি মাসে খরচ কত ছিল?'],
+  ['કુલ વેચાણ કેટલું છે?', 'દર મહિને ખર્ચ કેટલો હતો?'],
+  ['ಒಟ್ಟು ಮಾರಾಟ ಎಷ್ಟು?', 'ಪ್ರತಿ ತಿಂಗಳ ಖರ್ಚು ಎಷ್ಟು?'],
+  ['മൊത്തം വിൽപ്പന എത്ര?', 'ഓരോ മാസവും ചെലവ് എത്ര?'],
+  ['एकूण विक्री किती आहे?', 'दर महिन्याचा खर्च किती होता?'],
+  ['ਕੁੱਲ ਵਿਕਰੀ ਕਿੰਨੀ ਹੈ?', 'ਹਰ ਮਹੀਨੇ ਖਰਚ ਕਿੰਨਾ ਸੀ?'],
+  ['மொத்த விற்பனை எவ்வளவு?', 'ஒவ்வொரு மாதமும் செலவு எவ்வளவு?'],
+  ['మొత్తం అమ్మకాలు ఎంత?', 'ప్రతి నెల ఖర్చు ఎంత?'],
+  ['ମୋଟ ବିକ୍ରୟ କେତେ?', 'ପ୍ରତି ମାସର ଖର୍ଚ୍ଚ କେତେ?'],
+  ['کل فروخت کتنی ہے؟', 'ہر مہینے کا خرچ کتنا تھا؟'],
+])('splits independent questions in supported scripts: %s', (first, second) => {
+  expect(splitAnalyses(first + second)).toEqual([first, second]);
+});
+
+it.each([
+  'सबसे अधिक बिक्री किस क्षेत्र में है? उसकी रैंकिंग क्या है?',
+  'सर्वाधिक विक्री कोणत्या प्रदेशात आहे? त्याची क्रमवारी काय आहे?',
+  'எந்தப் பகுதியில் அதிக விற்பனை? அதன் தரவரிசை என்ன?',
+  'Is revenue up? या खर्च बढ़ा है?',
+])('keeps multilingual dependent follow-ups together: %s', (question) => {
+  expect(splitAnalyses(question)).toEqual([question]);
+});
+
+it('recognizes native sentence punctuation before an explicit monthly report', () => {
+  expect(splitAnalyses('कुल बिक्री कितनी है। हर महीने खर्च कितना था।')).toEqual([
+    'कुल बिक्री कितनी है।',
+    'हर महीने खर्च कितना था।',
+  ]);
+});
+
+it.each([
+  'What was total revenue? For each month, include tax.',
+  'कुल बिक्री कितनी है? प्रत्येक महीने कर शामिल करें।',
+])('keeps declarative monthly instructions with their question: %s', (question) => {
+  expect(splitAnalyses(question)).toEqual([question]);
+});
