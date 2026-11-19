@@ -3,6 +3,6 @@
   "scripts": {
     "dev:backend": "node scripts/dev-backend.mjs",
     "dev:frontend": "npm run dev --prefix frontend",
-    "test:auth": "venv\\Scripts\\python.exe -m pytest backend/tests -q"
+    "test:auth": "node scripts/test-auth.mjs"
   }
 }

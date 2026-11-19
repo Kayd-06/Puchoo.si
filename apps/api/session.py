@@ -77,6 +77,43 @@ class SessionManager:
         return [dict(workspace) for workspace in self.workspaces.values()]
 
     @serialized
+    def list_tenant_workspaces(self, tenant_id):
+        """Refresh shared source discovery from SQL rather than a startup cache."""
+        from backend import database
+        from backend.workspace_repository import WorkspaceRepository
+
+        with database.SessionLocal() as db:
+            repository = WorkspaceRepository(db)
+            workspaces = repository.list_for_tenant(tenant_id)
+            current_ids = {workspace["id"] for workspace in workspaces}
+            for workspace_id, cached in list(self.workspaces.items()):
+                if cached.get("owner_user_id") == tenant_id and workspace_id not in current_ids:
+                    self.workspaces.pop(workspace_id, None)
+                    self.workspace_guardrails.pop(workspace_id, None)
+                    self.query_history.pop(workspace_id, None)
+                    self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+                    self.active_proposals.pop(workspace_id, None)
+            for workspace in workspaces:
+                workspace_id = workspace["id"]
+                cached = self.workspaces.get(workspace_id, {})
+                # Server credentials deliberately live only in this process.
+                if (workspace.get("source_type") == "server"
+                        and cached.get("owner_user_id") == tenant_id
+                        and cached.get("database_uri")):
+                    for key in ("database_uri", "connect_args"):
+                        if key in cached:
+                            workspace[key] = cached[key]
+                    workspace["availability"] = "available"
+                self.workspaces[workspace_id] = workspace
+                if workspace_id not in self.workspace_guardrails:
+                    self.workspace_guardrails[workspace_id] = {
+                        **self.DEFAULT_GUARDRAILS, **repository.get_guardrails(workspace_id),
+                    }
+                if workspace_id not in self.query_history:
+                    self.query_history[workspace_id] = repository.get_history(workspace_id)
+            return [dict(workspace) for workspace in workspaces]
+
+    @serialized
     def get_schema(self, workspace_id):
         return self.schema_snapshots.get(f"schema_{workspace_id}")
 

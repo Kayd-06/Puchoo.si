@@ -235,3 +235,48 @@ def test_migration_0016_round_trip_keeps_history(tmp_path):
     command.upgrade(config, "head")
     with database.engine.connect() as connection:
         assert connection.execute(text("SELECT entry_id FROM workspace_history_records")).scalars().all() == ["q1"]
+
+
+@pytest.mark.parametrize("role", ["owner", "editor", "viewer"])
+def test_workspace_listing_refreshes_persisted_shared_sources(tmp_path, monkeypatch, role):
+    import sqlite3
+    from apps.api.session import SessionManager
+    from apps.api.routers import workspaces as router
+    from backend.workspace_repository import WorkspaceRepository
+
+    source = tmp_path / "sales.db"
+    with sqlite3.connect(source) as connection:
+        connection.execute("CREATE TABLE sales (amount INTEGER)")
+        connection.execute("INSERT INTO sales VALUES (42)")
+    sessions = _fresh(tmp_path, "shared.db")
+    with sessions() as db:
+        db.add(_user("owner"))
+        db.commit()
+        repository = WorkspaceRepository(db)
+        repository.ensure_tenant("owner", "owner", name="Acme", workspace_type="business")
+        repository.save_workspace({"id": "shared", "name": "Sales", "source_type": "spreadsheet", "source_ref": str(source)}, "owner")
+        db.commit()
+
+    # A running API cache predates an upload committed to the same SQL store.
+    manager = SessionManager.__new__(SessionManager)
+    manager.workspaces = {}
+    manager.workspace_guardrails = {}
+    manager.query_history = {}
+    manager.schema_snapshots = {}
+    manager.active_proposals = {}
+    monkeypatch.setattr(router, "session_manager", manager)
+    user = _user("owner" if role == "owner" else "member", owner_id=None if role == "owner" else "owner", role=role)
+    assert router.list_workspaces(user=user) == [{"id": "shared", "name": "Sales", "source_type": "spreadsheet"}]
+    assert manager.get_workspace("shared")["owner_user_id"] == "owner"
+    from apps.core.workspaces import get_schema_snapshot
+    assert "Table: sales" in get_schema_snapshot(manager.get_workspace("shared")["database_uri"])
+    outsider = _user("outsider")
+    assert router.list_workspaces(user=outsider) == []
+    assert manager.get_workspace("shared") is not None
+
+    from backend.models import WorkspaceRecord
+    with sessions() as db:
+        db.delete(db.get(WorkspaceRecord, "shared"))
+        db.commit()
+    assert router.list_workspaces(user=user) == []
+    assert manager.get_workspace("shared") is None

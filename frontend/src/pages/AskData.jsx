@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
+import { can } from '../auth/capabilities';
+import SharedDataEmptyState from '../components/workspace/SharedDataEmptyState';
 import {
   useChatState,
   chatScope,
@@ -680,7 +682,12 @@ export function answerVerification(status, labels = DEFAULT_RESULT_LABELS) {
 export default function AskData() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { activeWorkspaceId, activeWorkspace, refreshWorkspaces } = useAppContext();
+  const {
+    activeWorkspaceId,
+    activeWorkspace,
+    refreshWorkspaces,
+    loading: workspaceLoading,
+  } = useAppContext();
   const { user } = useAuth();
   const scope = chatScope(user, activeWorkspaceId);
   const currentScope = useRef(scopeKey(scope));
@@ -1346,6 +1353,15 @@ export default function AskData() {
       </button>
     </section>
   ) : null;
+
+  if (!activeWorkspace && !can(user, 'manage_data_sources')) {
+    return (
+      <div className="ask-page">
+        {welcomeNotice}
+        <SharedDataEmptyState refreshWorkspaces={refreshWorkspaces} loading={workspaceLoading} />
+      </div>
+    );
+  }
 
   if (user?.workspace_role === 'viewer') {
     return (

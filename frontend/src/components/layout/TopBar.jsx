@@ -225,7 +225,10 @@ export default function TopBar({ onOpenNavigation }) {
                   </p>
                 ) : (
                   notifications.map((notification) => (
-                    <div key={notification.id} className="notification-row">
+                    <div
+                      key={notification.id}
+                      className={`notification-row${notification.read_at ? '' : ' is-unread'}`}
+                    >
                       <button
                         type="button"
                         onClick={() => markRead(notification)}
@@ -233,7 +236,9 @@ export default function TopBar({ onOpenNavigation }) {
                       >
                         <div>
                           <strong>{notification.title}</strong>
-                          <span>{timeLabel(notification.created_at)}</span>
+                          <time dateTime={notification.created_at}>
+                            {timeLabel(notification.created_at)}
+                          </time>
                         </div>
                         {notification.body && <p>{notification.body}</p>}
                       </button>

@@ -17,6 +17,40 @@
   --ask-badge-bg: #181818;
   --ask-badge-fg: #d5d5d5;
 }
+#root .app-container .ask-shared-empty {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 740px;
+  margin: clamp(20px, 6vh, 64px) auto;
+  background: var(--ask-surface);
+  border-color: var(--ask-border);
+  color: var(--ask-text);
+}
+#root .app-container .ask-shared-empty .ask-viewer-icon {
+  background: var(--ask-badge-bg);
+  border-color: var(--ask-border);
+  color: var(--ask-text);
+}
+#root .app-container .ask-shared-empty h1 {
+  color: var(--ask-text);
+}
+#root .app-container .ask-shared-empty > span,
+#root .app-container .ask-shared-empty p {
+  color: var(--ask-muted);
+}
+.ask-shared-empty .ask-primary-action {
+  font: inherit;
+  cursor: pointer;
+}
+.ask-shared-empty .ask-primary-action:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+.ask-shared-empty .ask-shared-feedback {
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+}
+
 /* ask light palette */
 html[data-theme='light'] #root .app-container .ask-page {
   --ask-stage-bg: #e8ebef;
