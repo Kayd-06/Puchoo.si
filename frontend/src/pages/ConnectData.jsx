@@ -18,7 +18,7 @@ function fileLabel(file) {
 }
 
 export default function ConnectData() {
-  const { workspaces, setWorkspaces, setActiveWorkspaceId } = useAppContext();
+  const { addWorkspace, setActiveWorkspaceId } = useAppContext();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -78,7 +78,7 @@ export default function ConnectData() {
         multiple ? '/workspaces/upload-multiple' : '/workspaces/upload',
         { method: 'POST', body: form },
       );
-      setWorkspaces([...workspaces, workspace]);
+      addWorkspace(workspace);
       setActiveWorkspaceId(workspace.id);
       setCreatedWorkspace(workspace);
       setSelectedFiles([]);
@@ -124,7 +124,7 @@ export default function ConnectData() {
           port,
         }),
       });
-      setWorkspaces([...workspaces, workspace]);
+      addWorkspace(workspace);
       setActiveWorkspaceId(workspace.id);
       setCreatedWorkspace(workspace);
       setServerForm({

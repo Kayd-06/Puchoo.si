@@ -137,6 +137,7 @@ export default function History() {
   useEffect(() => {
     let cancelled = false;
     let inFlight = false;
+    let loadFailed = false;
     const unsubscribe = subscribeHistoryInvalidation((event) => {
       if (event.tenantId !== scope?.tenantId || event.workspaceId !== scope?.workspaceId) return;
       setHistory((current) =>
@@ -147,16 +148,25 @@ export default function History() {
       if (cancelled || inFlight || !scope) return;
       inFlight = true;
       const version = clearVersion(scope);
-      setError('');
       if (initial) {
+        setError('');
         setHistory([]);
         setLoading(true);
       }
       try {
         const data = await fetchApi(`/history/${activeWorkspaceId}`);
-        if (!cancelled) setHistory(filterHistory(scope, data || [], version));
+        if (!cancelled) {
+          setHistory(filterHistory(scope, data || [], version));
+          // Clear only our own load error, never an error from a delete action.
+          if (loadFailed) setError('');
+          loadFailed = false;
+        }
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Could not load query history.');
+        // A failed background refresh keeps the list on screen without an error banner.
+        if (!cancelled && initial) {
+          loadFailed = true;
+          setError(err.message || 'Could not load query history.');
+        }
       } finally {
         inFlight = false;
         if (!cancelled) setLoading(false);
@@ -168,7 +178,7 @@ export default function History() {
     loadHistory(true);
     window.addEventListener('focus', refreshVisibleHistory);
     document.addEventListener('visibilitychange', refreshVisibleHistory);
-    const timer = window.setInterval(refreshVisibleHistory, 15000);
+    const timer = window.setInterval(refreshVisibleHistory, 30000);
     return () => {
       cancelled = true;
       window.clearInterval(timer);

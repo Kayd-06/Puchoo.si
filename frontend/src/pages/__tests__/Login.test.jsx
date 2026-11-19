@@ -121,3 +121,12 @@ it('returns to login when verification reports an expired server session', async
   expect(screen.getByRole('button', { name: 'Log in' })).toBeEnabled();
   expect(screen.getByRole('alert')).toHaveTextContent('Login session expired');
 });
+
+it('ends the resend cooldown on wall-clock time even when timer ticks are throttled', async () => {
+  renderCode();
+  expect(screen.getByRole('button', { name: /Resend code in 60s/ })).toBeDisabled();
+  // A background tab can skip ticks; only one tick fires after 60 real seconds.
+  vi.setSystemTime(Date.now() + 59000);
+  await act(async () => vi.advanceTimersByTime(1000));
+  expect(screen.getByRole('button', { name: 'Resend code' })).toBeEnabled();
+});

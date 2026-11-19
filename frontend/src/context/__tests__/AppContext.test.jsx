@@ -54,3 +54,40 @@ it('does not restore shared sources from a response that arrives after sign-out'
   expect(screen.getByText('No shared source (0)')).toBeInTheDocument();
   expect(localStorage.getItem('pucho_active_workspace')).toBeNull();
 });
+
+function UploadedSource() {
+  const { addWorkspace, setActiveWorkspaceId } = useAppContext();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        addWorkspace({ id: 'new-upload', name: 'Fresh upload' });
+        setActiveWorkspaceId('new-upload');
+      }}
+    >
+      Finish upload
+    </button>
+  );
+}
+
+it('keeps a just-uploaded source when an older list response arrives later', async () => {
+  const pending = [];
+  fetchApi.mockImplementation((path) =>
+    path === '/workspaces/' ? new Promise((resolve) => pending.push(resolve)) : Promise.resolve({}),
+  );
+  render(
+    <AppProvider>
+      <Sources />
+      <UploadedSource />
+    </AppProvider>,
+  );
+  await waitFor(() => expect(pending).toHaveLength(1));
+  await act(async () => pending[0]([{ id: 'old-source', name: 'Old source' }]));
+  await screen.findByText('Old source (1)');
+  fireEvent(window, new Event('focus'));
+  await waitFor(() => expect(pending).toHaveLength(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Finish upload' }));
+  await act(async () => pending[1]([{ id: 'old-source', name: 'Old source' }]));
+  expect(screen.getByText('Fresh upload (2)')).toBeInTheDocument();
+  expect(localStorage.getItem('pucho_active_workspace')).toBe('new-upload');
+});
