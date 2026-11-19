@@ -35,6 +35,7 @@ export default function Login() {
   const requestPending = useRef(false);
   const [challengeLeft, setChallengeLeft] = useState(CHALLENGE_SECONDS);
   const [resendLeft, setResendLeft] = useState(RESEND_SECONDS);
+  const resendDeadline = useRef(0);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -56,8 +57,10 @@ export default function Login() {
   useEffect(() => {
     if (step !== 'code') return undefined;
     const deadline = Date.now() + CHALLENGE_SECONDS * 1000;
+    resendDeadline.current = Date.now() + RESEND_SECONDS * 1000;
     const timer = setInterval(() => {
-      setResendLeft((value) => Math.max(0, value - 1));
+      // Wall-clock deadlines stay accurate when a background tab throttles timers.
+      setResendLeft(Math.max(0, Math.ceil((resendDeadline.current - Date.now()) / 1000)));
       const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
       setChallengeLeft(remaining);
       if (remaining === 0) {
@@ -149,6 +152,7 @@ export default function Login() {
     try {
       await resendLoginCode();
       setCode('');
+      resendDeadline.current = Date.now() + RESEND_SECONDS * 1000;
       setResendLeft(RESEND_SECONDS);
       setToast('We sent a new 6-digit code to your email.');
     } catch (error) {

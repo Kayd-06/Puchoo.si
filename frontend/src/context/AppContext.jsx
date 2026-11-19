@@ -35,6 +35,12 @@ export function AppProvider({ children }) {
     return wsData;
   }, [setActiveWorkspaceId]);
 
+  // A locally created source wins over any list request that was already in flight.
+  const addWorkspace = useCallback((workspace) => {
+    workspaceRequest.current += 1;
+    setWorkspaces((current) => [...current.filter((item) => item.id !== workspace.id), workspace]);
+  }, []);
+
   // Load initial data
   useEffect(() => {
     const clearUnauthorizedWorkspace = () => {
@@ -72,7 +78,7 @@ export function AppProvider({ children }) {
     };
     window.addEventListener('focus', refreshSharedSources);
     document.addEventListener('visibilitychange', refreshSharedSources);
-    const timer = window.setInterval(refreshSharedSources, 15000);
+    const timer = window.setInterval(refreshSharedSources, 30000);
     return () => {
       workspaceRequest.current += 1;
       window.clearInterval(timer);
@@ -89,6 +95,7 @@ export function AppProvider({ children }) {
   const value = {
     workspaces,
     setWorkspaces,
+    addWorkspace,
     activeWorkspaceId,
     setActiveWorkspaceId,
     activeWorkspace: getActiveWorkspace(),

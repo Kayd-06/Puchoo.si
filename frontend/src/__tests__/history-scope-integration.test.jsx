@@ -320,7 +320,35 @@ it('refreshes shared history while the member keeps the page open', async () => 
   render(<App entry="/history" />);
   await screen.findByText('No questions yet');
   fixture.records.a = [record('owner-live', 'New shared question')];
-  await act(async () => vi.advanceTimersByTime(15000));
+  await act(async () => vi.advanceTimersByTime(30000));
   await screen.findByRole('heading', { name: 'New shared question' });
   vi.useRealTimers();
+});
+
+it('keeps the list and shows no error when a background refresh fails', async () => {
+  render(<App entry="/history" />);
+  await screen.findByRole('heading', { name: 'original question' });
+  fetchApi.mockImplementation((path, options) =>
+    path.startsWith('/history/')
+      ? Promise.reject(new Error('Bad gateway'))
+      : defaultApi(path, options),
+  );
+  await act(async () => fireEvent(window, new Event('focus')));
+  await waitFor(() => expect(fetchApi).toHaveBeenCalledTimes(2));
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'original question' })).toBeInTheDocument();
+});
+
+it('shows an initial load error and clears it after a later refresh succeeds', async () => {
+  fetchApi.mockImplementation((path, options) =>
+    path.startsWith('/history/')
+      ? Promise.reject(new Error('Bad gateway'))
+      : defaultApi(path, options),
+  );
+  render(<App entry="/history" />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Bad gateway');
+  fetchApi.mockImplementation(defaultApi);
+  await act(async () => fireEvent(window, new Event('focus')));
+  await screen.findByRole('heading', { name: 'original question' });
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
 });
