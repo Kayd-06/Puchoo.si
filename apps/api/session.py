@@ -4,6 +4,7 @@ All production mutations enter serialized commands. This is not a multi-worker s
 """
 
 import logging
+import time
 from contextlib import contextmanager
 from copy import deepcopy
 from functools import wraps
@@ -23,6 +24,7 @@ def serialized(method):
 
 
 class SessionManager:
+    SOURCE_REFRESH_SECONDS = 30
     DEFAULT_GUARDRAILS = {
         "max_rows": 500,
         "timeout_seconds": 30,
@@ -48,6 +50,12 @@ class SessionManager:
         self.schema_snapshots: Dict[str, str] = {}
         # Stores active proposal per workspace to avoid stale references
         self.active_proposals: Dict[str, Dict[str, Any]] = {}
+        self._init_refresh_state()
+
+    def _init_refresh_state(self) -> None:
+        self._clock = time.monotonic
+        self._tenant_refreshed_at: Dict[str, float] = {}
+        self._source_generation = 0
 
     @contextmanager
     def _edit(self, workspace_id=None, db_action=None):
@@ -76,15 +84,70 @@ class SessionManager:
     def list_workspaces(self):
         return [dict(workspace) for workspace in self.workspaces.values()]
 
-    @serialized
+    def _tenant_cache(self, tenant_id):
+        return [dict(workspace) for workspace in self.workspaces.values()
+                if workspace.get("owner_user_id") == tenant_id]
+
+    @staticmethod
+    def _keep_runtime_credentials(workspace, existing):
+        """Server credentials deliberately live only in this process, never in SQL."""
+        if (workspace.get("source_type") == "server"
+                and existing.get("owner_user_id") == workspace.get("owner_user_id")
+                and existing.get("database_uri")):
+            for key in ("database_uri", "connect_args"):
+                if key in existing:
+                    workspace[key] = existing[key]
+            workspace["availability"] = "available"
+        return workspace
+
+    def _invalidate_tenant_refresh(self, tenant_id=None):
+        """Call with STATE_LOCK held whenever this process adds or removes a source."""
+        self._source_generation += 1
+        if tenant_id is None:
+            self._tenant_refreshed_at.clear()
+        else:
+            self._tenant_refreshed_at.pop(tenant_id, None)
+
     def list_tenant_workspaces(self, tenant_id):
-        """Refresh shared source discovery from SQL rather than a startup cache."""
+        """Refresh shared source discovery from SQL, at most once per interval per tenant.
+
+        The SQL read runs without STATE_LOCK so a slow or waking database never
+        blocks other requests. A local add/remove during the read bumps the
+        generation, and the stale read is then discarded in favour of the cache.
+        """
+        from sqlalchemy.exc import SQLAlchemyError
         from backend import database
         from backend.workspace_repository import WorkspaceRepository
 
-        with database.SessionLocal() as db:
-            repository = WorkspaceRepository(db)
-            workspaces = repository.list_for_tenant(tenant_id)
+        with STATE_LOCK:
+            refreshed_at = self._tenant_refreshed_at.get(tenant_id)
+            if refreshed_at is not None and self._clock() - refreshed_at < self.SOURCE_REFRESH_SECONDS:
+                return self._tenant_cache(tenant_id)
+            generation = self._source_generation
+            known_guardrails = set(self.workspace_guardrails)
+            known_history = set(self.query_history)
+
+        try:
+            with database.SessionLocal() as db:
+                repository = WorkspaceRepository(db)
+                workspaces = repository.list_for_tenant(tenant_id)
+                guardrails = {
+                    workspace["id"]: repository.get_guardrails(workspace["id"])
+                    for workspace in workspaces if workspace["id"] not in known_guardrails
+                }
+                history = {
+                    workspace["id"]: repository.get_history(workspace["id"])
+                    for workspace in workspaces if workspace["id"] not in known_history
+                }
+        except SQLAlchemyError:
+            logger.warning("shared_source_refresh_failed", exc_info=True)
+            with STATE_LOCK:
+                return self._tenant_cache(tenant_id)
+
+        with STATE_LOCK:
+            if generation != self._source_generation:
+                # This process changed sources mid-read; its cache is newer than the read.
+                return self._tenant_cache(tenant_id)
             current_ids = {workspace["id"] for workspace in workspaces}
             for workspace_id, cached in list(self.workspaces.items()):
                 if cached.get("owner_user_id") == tenant_id and workspace_id not in current_ids:
@@ -95,22 +158,15 @@ class SessionManager:
                     self.active_proposals.pop(workspace_id, None)
             for workspace in workspaces:
                 workspace_id = workspace["id"]
-                cached = self.workspaces.get(workspace_id, {})
-                # Server credentials deliberately live only in this process.
-                if (workspace.get("source_type") == "server"
-                        and cached.get("owner_user_id") == tenant_id
-                        and cached.get("database_uri")):
-                    for key in ("database_uri", "connect_args"):
-                        if key in cached:
-                            workspace[key] = cached[key]
-                    workspace["availability"] = "available"
-                self.workspaces[workspace_id] = workspace
+                existing = self.workspaces.get(workspace_id, {})
+                self.workspaces[workspace_id] = self._keep_runtime_credentials(workspace, existing)
                 if workspace_id not in self.workspace_guardrails:
                     self.workspace_guardrails[workspace_id] = {
-                        **self.DEFAULT_GUARDRAILS, **repository.get_guardrails(workspace_id),
+                        **self.DEFAULT_GUARDRAILS, **guardrails.get(workspace_id, {}),
                     }
                 if workspace_id not in self.query_history:
-                    self.query_history[workspace_id] = repository.get_history(workspace_id)
+                    self.query_history[workspace_id] = history.get(workspace_id, [])
+            self._tenant_refreshed_at[tenant_id] = self._clock()
             return [dict(workspace) for workspace in workspaces]
 
     @serialized
@@ -134,6 +190,7 @@ class SessionManager:
             self.workspaces[ws_id] = dict(workspace)
             self.workspace_guardrails[ws_id] = self.DEFAULT_GUARDRAILS.copy()
             self.query_history[ws_id] = []
+            self._invalidate_tenant_refresh(workspace.get("owner_user_id"))
 
     def append_history(self, workspace_id, record):
         from backend import database
@@ -200,6 +257,7 @@ class SessionManager:
                 db.delete(record)
         with self._edit(db_action=action):
             removed = self.workspaces.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(removed.get("owner_user_id") if removed else None)
             self.workspace_guardrails.pop(workspace_id, None)
             self.query_history.pop(workspace_id, None)
             self.schema_snapshots.pop(f"schema_{workspace_id}", None)
@@ -240,16 +298,11 @@ class SessionManager:
             workspaces, guardrails, history = {}, {}, {}
             for record in db.scalars(select(WorkspaceRecord)).all():
                 workspace = repository._as_dict(record)
-                existing = runtime.get(record.id, {})
-                if record.source_type == "server" and existing.get("owner_user_id") == record.tenant_id and existing.get("database_uri"):
-                    for key in ("database_uri", "connect_args"):
-                        if key in existing:
-                            workspace[key] = existing[key]
-                    workspace["availability"] = "available"
-                workspaces[record.id] = workspace
+                workspaces[record.id] = self._keep_runtime_credentials(workspace, runtime.get(record.id, {}))
                 guardrails[record.id] = {**self.DEFAULT_GUARDRAILS, **repository.get_guardrails(record.id)}
                 history[record.id] = repository.get_history(record.id)
             self.workspaces, self.workspace_guardrails, self.query_history = workspaces, guardrails, history
+            self._invalidate_tenant_refresh()
 
     def _save_to_database(self, workspace_ids: Iterable[str] | None = None, db_action=None) -> None:
         from backend import database

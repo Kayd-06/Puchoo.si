@@ -225,6 +225,7 @@ def test_invited_member_discovers_owner_upload_after_cache_loss(app, tmp_path, m
                 headers=csrf_headers(member),
             ).status_code == 202
             finish_signup(member, member_email, otp_codes)
+            session_manager._init_refresh_state()
             monkeypatch.setattr(session_manager, "workspaces", {})
             monkeypatch.setattr(session_manager, "workspace_guardrails", {})
             monkeypatch.setattr(session_manager, "query_history", {})
@@ -232,5 +233,38 @@ def test_invited_member_discovers_owner_upload_after_cache_loss(app, tmp_path, m
             assert listed.status_code == 200
             assert [source["id"] for source in listed.json()] == [workspace_id]
             assert member.get(f"/api/workspaces/{workspace_id}").status_code == (200 if role == "editor" else 403)
+        finally:
+            member.close()
+
+
+def test_member_sees_a_new_owner_upload_without_waiting_for_the_throttle(app, tmp_path, monkeypatch, otp_codes):
+    monkeypatch.setattr(workspace_core, "LOCAL_WORKSPACE_DIRECTORY", tmp_path)
+    monkeypatch.setattr("apps.api.session.save_local_state", lambda **kwargs: None)
+    product = create_app(include_product=True)
+    with TestClient(product) as owner:
+        email = "throttle-owner@example.com"
+        assert owner.post("/api/v1/auth/signup", json=signup_payload(email=email, workspace_type="business", workspace_name="Team"), headers=csrf_headers(owner)).status_code == 202
+        finish_signup(owner, email, otp_codes)
+        invitation = owner.post("/api/v1/auth/workspace/invite", json={"role": "viewer"}, headers=csrf_headers(owner))
+        member = TestClient(product)
+        try:
+            member_email = "throttle-viewer@example.com"
+            assert member.post("/api/v1/auth/signup", json=signup_payload(email=member_email, invite_code=invitation.json()["code"]), headers=csrf_headers(member)).status_code == 202
+            finish_signup(member, member_email, otp_codes)
+            assert member.get("/api/workspaces/").json() == []
+            uploaded = owner.post(
+                "/api/workspaces/upload", data={"name": "Fresh"},
+                files={"file": ("fresh.csv", b"amount\n1\n", "text/csv")}, headers=csrf_headers(owner),
+            )
+            assert uploaded.status_code == 200
+            assert [source["id"] for source in member.get("/api/workspaces/").json()] == [uploaded.json()["id"]]
+            outsider_email = "throttle-outsider@example.com"
+            outsider = TestClient(product)
+            try:
+                assert outsider.post("/api/v1/auth/signup", json=signup_payload(email=outsider_email, workspace_type="business", workspace_name="Other"), headers=csrf_headers(outsider)).status_code == 202
+                finish_signup(outsider, outsider_email, otp_codes)
+                assert outsider.get("/api/workspaces/").json() == []
+            finally:
+                outsider.close()
         finally:
             member.close()

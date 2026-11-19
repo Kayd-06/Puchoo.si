@@ -264,6 +264,9 @@ def test_workspace_listing_refreshes_persisted_shared_sources(tmp_path, monkeypa
     manager.query_history = {}
     manager.schema_snapshots = {}
     manager.active_proposals = {}
+    manager._init_refresh_state()
+    now = [1000.0]
+    manager._clock = lambda: now[0]
     monkeypatch.setattr(router, "session_manager", manager)
     user = _user("owner" if role == "owner" else "member", owner_id=None if role == "owner" else "owner", role=role)
     assert router.list_workspaces(user=user) == [{"id": "shared", "name": "Sales", "source_type": "spreadsheet"}]
@@ -278,5 +281,143 @@ def test_workspace_listing_refreshes_persisted_shared_sources(tmp_path, monkeypa
     with sessions() as db:
         db.delete(db.get(WorkspaceRecord, "shared"))
         db.commit()
+    now[0] += manager.SOURCE_REFRESH_SECONDS
     assert router.list_workspaces(user=user) == []
     assert manager.get_workspace("shared") is None
+
+
+def _refresh_fixture(tmp_path, monkeypatch):
+    """A manager with an empty cache, a fake clock and two tenants in SQL."""
+    from apps.api.session import SessionManager
+    from backend.workspace_repository import WorkspaceRepository
+
+    sessions = _fresh(tmp_path, "refresh.db")
+    with sessions() as db:
+        db.add_all([_user("owner"), _user("rival")])
+        db.commit()
+        repository = WorkspaceRepository(db)
+        repository.ensure_tenant("owner", "owner", name="Acme", workspace_type="business")
+        repository.ensure_tenant("rival", "rival", name="Other", workspace_type="business")
+        repository.save_workspace({"id": "first", "name": "First", "source_type": "file"}, "owner")
+        repository.save_workspace({"id": "rival-source", "name": "Rival", "source_type": "file"}, "rival")
+        db.commit()
+    monkeypatch.setattr("apps.api.session.save_local_state", lambda **kwargs: None)
+    manager = SessionManager.__new__(SessionManager)
+    manager.workspaces, manager.workspace_guardrails, manager.query_history = {}, {}, {}
+    manager.schema_snapshots, manager.active_proposals, manager.profile = {}, {}, {}
+    manager._init_refresh_state()
+    now = [1000.0]
+    manager._clock = lambda: now[0]
+
+    def add_in_sql(workspace_id, tenant_id="owner"):
+        with sessions() as db:
+            WorkspaceRepository(db).save_workspace(
+                {"id": workspace_id, "name": workspace_id, "source_type": "file"}, tenant_id,
+            )
+            db.commit()
+
+    return manager, now, add_in_sql
+
+
+def _ids(workspaces):
+    return sorted(workspace["id"] for workspace in workspaces)
+
+
+def test_shared_source_refresh_is_throttled_per_tenant(tmp_path, monkeypatch):
+    manager, now, add_in_sql = _refresh_fixture(tmp_path, monkeypatch)
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first"]
+
+    reads = []
+    original = database.SessionLocal
+    monkeypatch.setattr(database, "SessionLocal", lambda: reads.append(1) or original())
+    add_in_sql("second")
+    now[0] += manager.SOURCE_REFRESH_SECONDS - 1
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first"]
+    assert reads == []
+
+    # Another tenant has its own timer and its own sources.
+    assert _ids(manager.list_tenant_workspaces("rival")) == ["rival-source"]
+    assert len(reads) == 1
+
+    now[0] += 1
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first", "second"]
+    assert len(reads) == 2
+
+
+def test_adding_or_removing_a_source_forces_the_next_refresh(tmp_path, monkeypatch):
+    manager, now, add_in_sql = _refresh_fixture(tmp_path, monkeypatch)
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first"]
+    add_in_sql("from-sql")
+
+    manager.add_workspace({"id": "uploaded", "name": "Upload", "source_type": "file", "owner_user_id": "owner"})
+    # No time passed, yet the list re-reads SQL instead of serving the throttled cache.
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first", "from-sql", "uploaded"]
+
+    add_in_sql("later")
+    manager.remove_workspace("uploaded")
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first", "from-sql", "later"]
+    assert manager.get_workspace("uploaded") is None
+
+
+def test_database_error_falls_back_to_this_tenants_cache_only(tmp_path, monkeypatch, caplog):
+    from sqlalchemy.exc import OperationalError
+
+    manager, now, add_in_sql = _refresh_fixture(tmp_path, monkeypatch)
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["first"]
+    assert _ids(manager.list_tenant_workspaces("rival")) == ["rival-source"]
+    original = database.SessionLocal
+    now[0] += manager.SOURCE_REFRESH_SECONDS
+
+    def unavailable():
+        raise OperationalError("SELECT 1", {}, Exception("database waking up"))
+
+    monkeypatch.setattr(database, "SessionLocal", unavailable)
+    with caplog.at_level("WARNING", logger="apps.api.session"):
+        assert _ids(manager.list_tenant_workspaces("owner")) == ["first"]
+    assert "shared_source_refresh_failed" in caplog.text
+    assert manager.list_tenant_workspaces("outsider") == []
+    # A failed read must not start a new throttle window: the next call retries SQL.
+    monkeypatch.setattr(database, "SessionLocal", original)
+    add_in_sql("after-outage")
+    assert _ids(manager.list_tenant_workspaces("owner")) == ["after-outage", "first"]
+
+
+def test_local_change_during_sql_read_keeps_the_newer_cache(tmp_path, monkeypatch):
+    from backend.workspace_repository import WorkspaceRepository
+
+    manager, now, _ = _refresh_fixture(tmp_path, monkeypatch)
+    original = WorkspaceRepository.list_for_tenant
+
+    def slow_read(self, tenant_id):
+        stale = original(self, tenant_id)
+        manager.add_workspace({"id": "mid-read", "name": "Upload", "source_type": "file", "owner_user_id": tenant_id})
+        return stale
+
+    monkeypatch.setattr(WorkspaceRepository, "list_for_tenant", slow_read)
+    manager.list_tenant_workspaces("owner")
+    assert manager.get_workspace("mid-read") is not None
+    assert "owner" not in manager._tenant_refreshed_at
+
+
+def test_refresh_keeps_server_credentials_in_memory_only(tmp_path, monkeypatch):
+    from apps.api.routers import workspaces as router
+
+    manager, now, _ = _refresh_fixture(tmp_path, monkeypatch)
+    manager.add_workspace({
+        "id": "warehouse", "name": "Warehouse", "source_type": "server", "owner_user_id": "owner",
+        "database_uri": "postgresql+psycopg://reader:secret@db.example/warehouse",
+        "connect_args": {"sslmode": "require"},
+    })
+    with database.SessionLocal() as db:
+        from backend.models import WorkspaceRecord
+        assert db.get(WorkspaceRecord, "warehouse").source_ref is None
+
+    monkeypatch.setattr(router, "session_manager", manager)
+    listed = router.list_workspaces(user=_user("owner"))
+    assert "warehouse" in [workspace["id"] for workspace in listed]
+    assert all("database_uri" not in workspace for workspace in listed)
+    cached = manager.get_workspace("warehouse")
+    assert cached["database_uri"].endswith("@db.example/warehouse")
+    assert cached["connect_args"] == {"sslmode": "require"}
+    assert cached["availability"] == "available"
+    assert router.list_workspaces(user=_user("outsider")) == []
