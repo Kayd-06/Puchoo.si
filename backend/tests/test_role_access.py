@@ -268,3 +268,43 @@ def test_admin_issued_code_stays_in_the_original_tenant(client, otp_codes):
         assert viewer.workspace_type == "institution"
     finally:
         db.close()
+
+
+@pytest.mark.parametrize('role', ['admin', 'editor', 'viewer'])
+@pytest.mark.parametrize('workspace_type', ['business', 'institution'])
+def test_members_read_owner_history_only_inside_their_tenant(app, monkeypatch, role, workspace_type):
+    """Sharing is tenant-wide, while editing permissions remain role-specific."""
+    from backend.routers.auth import current_user
+
+    owner_id = 'shared-history-owner'
+    member = User(
+        id=f'{role}-history-member',
+        full_name='Workspace Member',
+        email=f'{role}@example.com',
+        password_hash='unused',
+        workspace_type=workspace_type,
+        workspace_owner_id=owner_id,
+        workspace_role=role,
+    )
+    own_source = {'id': 'shared-source', 'name': 'Owner source', 'owner_user_id': owner_id}
+    foreign_source = {'id': 'foreign-source', 'name': 'Other source', 'owner_user_id': 'other-owner'}
+    owner_question = {'id': 'owner-record', 'question': 'Owner question', 'actor_user_id': owner_id}
+    product = create_app(include_product=True)
+    product.dependency_overrides[current_user] = lambda: member
+    with TestClient(product) as member_client:
+        monkeypatch.setattr(session_manager, 'workspaces', {
+            'shared-source': own_source, 'foreign-source': foreign_source,
+        })
+        monkeypatch.setattr(session_manager, 'query_history', {
+            'shared-source': [owner_question],
+            'foreign-source': [{'id': 'private-record', 'question': 'Private question'}],
+        })
+        sources = member_client.get('/api/workspaces/').json()
+        assert [source['id'] for source in sources] == ['shared-source']
+        history = member_client.get('/api/history/shared-source')
+        assert history.status_code == 200
+        assert history.json() == [owner_question]
+        assert member_client.get('/api/history/foreign-source').status_code == 404
+        if role != 'admin':
+            assert member_client.delete('/api/history/shared-source').status_code == 403
+            assert member_client.delete('/api/history/shared-source/records/owner-record').status_code == 403

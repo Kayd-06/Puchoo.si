@@ -33,6 +33,7 @@ export default function WorkspaceInvitePanel() {
   const sharedWorkspace =
     user?.workspace_type === 'business' || user?.workspace_type === 'institution';
   const canAdminister = can(user, 'administer_workspace');
+  const canChangeMemberRoles = canAdminister && (user?.role || user?.workspace_role) === 'owner';
   const roles = ['admin', 'editor', 'viewer'];
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export default function WorkspaceInvitePanel() {
   }
 
   async function changeMemberRole(member, nextRole) {
+    if (!canChangeMemberRoles) return;
     setNotice('');
     try {
       const updated = await updateWorkspaceMemberRole(member.id, nextRole);
@@ -214,12 +216,16 @@ export default function WorkspaceInvitePanel() {
                 <span className="workspace-member-owner">Owner</span>
               ) : (
                 <>
-                  <MemberRoleDropdown
-                    label={`Role for ${member.full_name}`}
-                    value={member.role}
-                    options={roles}
-                    onChange={(nextRole) => changeMemberRole(member, nextRole)}
-                  />
+                  {canChangeMemberRoles ? (
+                    <MemberRoleDropdown
+                      label={`Role for ${member.full_name}`}
+                      value={member.role}
+                      options={roles}
+                      onChange={(nextRole) => changeMemberRole(member, nextRole)}
+                    />
+                  ) : (
+                    <span className="workspace-member-owner">{member.role}</span>
+                  )}
                   <button
                     type="button"
                     className="workspace-member-remove"

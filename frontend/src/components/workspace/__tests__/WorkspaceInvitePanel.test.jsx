@@ -34,20 +34,21 @@ describe('WorkspaceInvitePanel', () => {
     ]);
   });
 
-  it('lets an admin invite people and manage non-owner members', async () => {
+  it('lets an admin invite people but keeps member roles read-only', async () => {
     render(<WorkspaceInvitePanel />);
 
     expect(screen.getByRole('heading', { name: /invite people to acme/i })).toBeInTheDocument();
     expect(await screen.findByText('Eddie Editor')).toBeInTheDocument();
-    expect(screen.getByLabelText(/role for eddie editor/i)).toHaveClass('workspace-member-role');
-    expect(screen.getByLabelText(/role for eddie editor/i)).toHaveValue('editor');
+    expect(screen.queryByLabelText(/role for eddie editor/i)).not.toBeInTheDocument();
+    expect(updateWorkspaceMemberRole).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /remove eddie editor/i })).toHaveClass(
       'workspace-member-remove',
     );
     expect(screen.queryByRole('button', { name: /remove olivia owner/i })).not.toBeInTheDocument();
   });
 
-  it('opens the role menu, supports keyboard focus, and saves a selected role', async () => {
+  it('lets the owner open the role menu and save a selected role', async () => {
+    user = { ...user, id: 'owner-id', role: 'owner', workspace_role: 'owner' };
     updateWorkspaceMemberRole.mockResolvedValue({
       id: 'editor-id',
       full_name: 'Eddie Editor',

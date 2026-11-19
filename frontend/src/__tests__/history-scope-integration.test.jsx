@@ -290,3 +290,37 @@ it('a changed account or role never renders the previous identity snapshot', () 
   view.rerender(<App />);
   expect(screen.queryByText('answer-old')).not.toBeInTheDocument();
 });
+
+it.each(['admin', 'editor', 'viewer'])(
+  '%s receives new owner questions when returning to the shared history page',
+  async (role) => {
+    fixture.user = {
+      id: `member-${role}`,
+      tenant_id: 'shared-owner',
+      workspace_owner_id: 'shared-owner',
+      role,
+    };
+    fixture.records.a = [];
+    render(<App entry="/history" />);
+    await screen.findByText('No questions yet');
+    fixture.records.a = [record('owner-question', 'Question asked by the owner')];
+    fireEvent(window, new Event('focus'));
+    await screen.findByRole('heading', { name: 'Question asked by the owner' });
+    expect(Boolean(screen.queryByRole('button', { name: /Continue chat/ }))).toBe(
+      role !== 'viewer',
+    );
+    expect(Boolean(screen.queryByRole('button', { name: /Delete chat/ }))).toBe(role === 'admin');
+    expect(Boolean(screen.queryByRole('button', { name: /Clear history/ }))).toBe(role === 'admin');
+  },
+);
+
+it('refreshes shared history while the member keeps the page open', async () => {
+  vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+  fixture.records.a = [];
+  render(<App entry="/history" />);
+  await screen.findByText('No questions yet');
+  fixture.records.a = [record('owner-live', 'New shared question')];
+  await act(async () => vi.advanceTimersByTime(15000));
+  await screen.findByRole('heading', { name: 'New shared question' });
+  vi.useRealTimers();
+});

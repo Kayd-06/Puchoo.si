@@ -415,11 +415,11 @@ def update_workspace_member_role(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> WorkspaceMemberResponse:
-    from apps.api.security import can_administer_workspace, tenant_owner_id
+    from apps.api.security import tenant_owner_id
 
     enforce_csrf(request)
-    if not can_administer_workspace(user):
-        raise HTTPException(status_code=403, detail="Only workspace owners and admins can manage members.")
+    if effective_role(user) != "owner":
+        raise HTTPException(status_code=403, detail="Only the workspace owner can change member roles.")
     tenant_id = tenant_owner_id(user)
     member = _managed_workspace_member(db, tenant_id, member_id)
     member.workspace_role = body.role

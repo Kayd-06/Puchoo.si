@@ -68,6 +68,8 @@ html[data-theme='light'] .session-history-refined {
   line-height: 1.65;
 }
 #root .session-history-refined .settings-action {
+  align-self: center;
+  justify-self: start;
   width: auto;
   min-height: 40px;
   padding: 10px 16px;
