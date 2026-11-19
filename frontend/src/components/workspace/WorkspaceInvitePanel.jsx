@@ -33,7 +33,11 @@ export default function WorkspaceInvitePanel() {
   const sharedWorkspace =
     user?.workspace_type === 'business' || user?.workspace_type === 'institution';
   const canAdminister = can(user, 'administer_workspace');
+  const isOwner = (user?.role || user?.workspace_role) === 'owner';
+  const canChangeMemberRoles = canAdminister && isOwner;
   const roles = ['admin', 'editor', 'viewer'];
+  // Only the owner may grant admin access; the server enforces the same rule.
+  const inviteRoles = isOwner ? roles : roles.filter((nextRole) => nextRole !== 'admin');
 
   useEffect(() => {
     if (!sharedWorkspace || !canAdminister) return undefined;
@@ -81,6 +85,7 @@ export default function WorkspaceInvitePanel() {
   }
 
   async function changeMemberRole(member, nextRole) {
+    if (!canChangeMemberRoles) return;
     setNotice('');
     try {
       const updated = await updateWorkspaceMemberRole(member.id, nextRole);
@@ -124,7 +129,7 @@ export default function WorkspaceInvitePanel() {
       </div>
 
       <div role="tablist" aria-label="Invite role" className="workspace-role-tabs">
-        {roles.map((nextRole) => (
+        {inviteRoles.map((nextRole) => (
           <button
             key={nextRole}
             type="button"
@@ -214,20 +219,28 @@ export default function WorkspaceInvitePanel() {
                 <span className="workspace-member-owner">Owner</span>
               ) : (
                 <>
-                  <MemberRoleDropdown
-                    label={`Role for ${member.full_name}`}
-                    value={member.role}
-                    options={roles}
-                    onChange={(nextRole) => changeMemberRole(member, nextRole)}
-                  />
-                  <button
-                    type="button"
-                    className="workspace-member-remove"
-                    aria-label={`Remove ${member.full_name}`}
-                    onClick={() => removeMember(member)}
-                  >
-                    <Trash2 size={15} />
-                  </button>
+                  {canChangeMemberRoles ? (
+                    <MemberRoleDropdown
+                      label={`Role for ${member.full_name}`}
+                      value={member.role}
+                      options={roles}
+                      onChange={(nextRole) => changeMemberRole(member, nextRole)}
+                    />
+                  ) : (
+                    <span className="workspace-member-owner">
+                      {member.role ? `${member.role[0].toUpperCase()}${member.role.slice(1)}` : ''}
+                    </span>
+                  )}
+                  {(isOwner || member.role !== 'admin') && (
+                    <button
+                      type="button"
+                      className="workspace-member-remove"
+                      aria-label={`Remove ${member.full_name}`}
+                      onClick={() => removeMember(member)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
                 </>
               )}
             </div>

@@ -34,20 +34,21 @@ describe('WorkspaceInvitePanel', () => {
     ]);
   });
 
-  it('lets an admin invite people and manage non-owner members', async () => {
+  it('lets an admin invite people but keeps member roles read-only', async () => {
     render(<WorkspaceInvitePanel />);
 
     expect(screen.getByRole('heading', { name: /invite people to acme/i })).toBeInTheDocument();
     expect(await screen.findByText('Eddie Editor')).toBeInTheDocument();
-    expect(screen.getByLabelText(/role for eddie editor/i)).toHaveClass('workspace-member-role');
-    expect(screen.getByLabelText(/role for eddie editor/i)).toHaveValue('editor');
+    expect(screen.queryByLabelText(/role for eddie editor/i)).not.toBeInTheDocument();
+    expect(updateWorkspaceMemberRole).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: /remove eddie editor/i })).toHaveClass(
       'workspace-member-remove',
     );
     expect(screen.queryByRole('button', { name: /remove olivia owner/i })).not.toBeInTheDocument();
   });
 
-  it('opens the role menu, supports keyboard focus, and saves a selected role', async () => {
+  it('lets the owner open the role menu and save a selected role', async () => {
+    user = { ...user, id: 'owner-id', role: 'owner', workspace_role: 'owner' };
     updateWorkspaceMemberRole.mockResolvedValue({
       id: 'editor-id',
       full_name: 'Eddie Editor',
@@ -68,6 +69,26 @@ describe('WorkspaceInvitePanel', () => {
       expect(updateWorkspaceMemberRole).toHaveBeenCalledWith('editor-id', 'viewer'),
     );
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('hides admin invites and admin removal from admins but not from the owner', async () => {
+    listWorkspaceMembers.mockResolvedValue([
+      { id: 'owner-id', full_name: 'Olivia Owner', email: 'owner@acme.test', role: 'owner' },
+      { id: 'admin-2', full_name: 'Ada Admin', email: 'ada@acme.test', role: 'admin' },
+    ]);
+    const view = render(<WorkspaceInvitePanel />);
+    expect(await screen.findByText('Ada Admin')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'admin' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'editor' })).toBeInTheDocument();
+    expect(screen.getByText('Admin')).toHaveClass('workspace-member-owner');
+    expect(screen.queryByRole('button', { name: /remove ada admin/i })).not.toBeInTheDocument();
+    view.unmount();
+
+    user = { ...user, id: 'owner-id', role: 'owner', workspace_role: 'owner' };
+    render(<WorkspaceInvitePanel />);
+    expect(await screen.findByText('Ada Admin')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'admin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove ada admin/i })).toBeInTheDocument();
   });
 
   it('stays hidden when the capability is absent', async () => {

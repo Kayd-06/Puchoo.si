@@ -1,0 +1,130 @@
+/* Keep the OTP actions independent of the site's generic button treatments. */
+#root .auth-shell .login-verification-actions {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+#root .auth-shell .login-verification-expiry {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid #cbd3e0;
+  border-radius: 12px;
+  background: #e6ecf5;
+  color: #52627b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#root .auth-shell .login-verification-expiry strong {
+  margin-left: auto;
+  color: #24344d;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+#root .auth-shell .login-verification-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 50px;
+  padding: 14px 20px;
+  border: 1px solid #172238;
+  border-radius: 14px;
+  background: #172238;
+  color: #fff;
+  box-shadow: 0 4px 10px #17223814;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+}
+#root .auth-shell .login-verification-submit:hover:not(:disabled) {
+  background: #263b5c;
+}
+#root .auth-shell .login-verification-submit:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+#root .auth-shell .login-verification-resend-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #cbd3e0;
+  color: #52627b;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#root .auth-shell :is(.login-verification-resend, .login-verification-back) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #c3cddc;
+  border-radius: 10px;
+  background: transparent;
+  color: #263b5c;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  box-shadow: none;
+  cursor: pointer;
+}
+#root .auth-shell .login-verification-back {
+  border-color: transparent;
+  padding-inline: 0;
+}
+#root .auth-shell :is(.login-verification-resend, .login-verification-back):hover:not(:disabled) {
+  color: #172238;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+#root .auth-shell :is(.login-verification-resend, .login-verification-back):disabled {
+  color: #66748a;
+  cursor: not-allowed;
+}
+#root
+  .auth-shell
+  :is(
+    .login-verification-submit,
+    .login-verification-resend,
+    .login-verification-back
+  ):focus-visible {
+  outline: 2px solid #315a96;
+  outline-offset: 3px;
+}
+#root .auth-shell .login-verification-actions svg,
+#root .auth-shell .login-verification-back svg {
+  flex-shrink: 0;
+}
+.login-verification-spinner {
+  animation: login-verification-spin 1s linear infinite;
+}
+@keyframes login-verification-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 420px) {
+  #root .auth-shell .login-verification-resend-row {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+  #root .auth-shell .login-verification-resend {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-verification-spinner {
+    animation: none;
+  }
+}

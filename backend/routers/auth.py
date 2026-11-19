@@ -338,6 +338,8 @@ def _create_workspace_invite(
 
     if user.workspace_type == "personal" or not can_administer_workspace(user):
         raise HTTPException(status_code=403, detail="Only workspace owners and admins can create invite codes.")
+    if body.role == "admin" and effective_role(user) != "owner":
+        raise HTTPException(status_code=403, detail="Only the workspace owner can create admin invite codes.")
     tenant_id = tenant_owner_id(user)
     tenant_owner = db.get(User, tenant_id)
     if tenant_owner is None:
@@ -415,11 +417,11 @@ def update_workspace_member_role(
     user: User = Depends(current_user),
     db: Session = Depends(get_db),
 ) -> WorkspaceMemberResponse:
-    from apps.api.security import can_administer_workspace, tenant_owner_id
+    from apps.api.security import tenant_owner_id
 
     enforce_csrf(request)
-    if not can_administer_workspace(user):
-        raise HTTPException(status_code=403, detail="Only workspace owners and admins can manage members.")
+    if effective_role(user) != "owner":
+        raise HTTPException(status_code=403, detail="Only the workspace owner can change member roles.")
     tenant_id = tenant_owner_id(user)
     member = _managed_workspace_member(db, tenant_id, member_id)
     member.workspace_role = body.role
@@ -450,6 +452,8 @@ def remove_workspace_member(
         raise HTTPException(status_code=403, detail="Only workspace owners and admins can manage members.")
     tenant_id = tenant_owner_id(user)
     member = _managed_workspace_member(db, tenant_id, member_id)
+    if effective_role(member) == "admin" and effective_role(user) != "owner":
+        raise HTTPException(status_code=403, detail="Only the workspace owner can remove admins.")
     now = utcnow()
     _revoke_sessions_and_challenges(db, member.id, now)
     # The removed member still knows the shared codes; retire all of them

@@ -268,3 +268,116 @@ def test_admin_issued_code_stays_in_the_original_tenant(client, otp_codes):
         assert viewer.workspace_type == "institution"
     finally:
         db.close()
+
+
+@pytest.mark.parametrize('role', ['admin', 'editor', 'viewer'])
+@pytest.mark.parametrize('workspace_type', ['business', 'institution'])
+def test_members_read_owner_history_only_inside_their_tenant(app, monkeypatch, role, workspace_type):
+    """Sharing is tenant-wide, while editing permissions remain role-specific."""
+    from backend.routers.auth import current_user
+
+    owner_id = 'shared-history-owner'
+    member = User(
+        id=f'{role}-history-member',
+        full_name='Workspace Member',
+        email=f'{role}@example.com',
+        password_hash='unused',
+        workspace_type=workspace_type,
+        workspace_owner_id=owner_id,
+        workspace_role=role,
+    )
+    own_source = {'id': 'shared-source', 'name': 'Owner source', 'owner_user_id': owner_id}
+    foreign_source = {'id': 'foreign-source', 'name': 'Other source', 'owner_user_id': 'other-owner'}
+    owner_question = {'id': 'owner-record', 'question': 'Owner question', 'actor_user_id': owner_id}
+    product = create_app(include_product=True)
+    product.dependency_overrides[current_user] = lambda: member
+    with TestClient(product) as member_client:
+        monkeypatch.setattr(session_manager, 'workspaces', {
+            'shared-source': own_source, 'foreign-source': foreign_source,
+        })
+        monkeypatch.setattr(session_manager, 'query_history', {
+            'shared-source': [owner_question],
+            'foreign-source': [{'id': 'private-record', 'question': 'Private question'}],
+        })
+        sources = member_client.get('/api/workspaces/').json()
+        assert [source['id'] for source in sources] == ['shared-source']
+        history = member_client.get('/api/history/shared-source')
+        assert history.status_code == 200
+        assert history.json() == [owner_question]
+        assert member_client.get('/api/history/foreign-source').status_code == 404
+        if role != 'admin':
+            assert member_client.delete('/api/history/shared-source').status_code == 403
+            assert member_client.delete('/api/history/shared-source/records/owner-record').status_code == 403
+
+
+def test_signed_in_admin_can_delete_a_record_and_clear_shared_history(client, otp_codes, monkeypatch):
+    """Admins manage the owner's shared history through the real session and CSRF path."""
+
+    owner_email = "history-admin-owner@business.com"
+    assert client.post(
+        "/api/v1/auth/signup",
+        json=signup_payload(
+            full_name="History Owner",
+            email=owner_email,
+            workspace_type="business",
+            workspace_name="Ledger",
+        ),
+        headers=csrf_headers(client),
+    ).status_code == 202
+    finish_signup(client, owner_email, otp_codes)
+    invite = client.post(
+        "/api/v1/auth/workspace/invite", json={"role": "admin"}, headers=csrf_headers(client),
+    )
+    assert invite.status_code == 200
+    with database.SessionLocal() as db:
+        owner_id = db.query(User).filter_by(email=owner_email).one().id
+
+    workspace_id = "admin-managed-history-workspace"
+    session_manager.workspaces[workspace_id] = {
+        "id": workspace_id,
+        "name": "Ledger reporting",
+        "owner_user_id": owner_id,
+        "database_uri": "sqlite:///:memory:",
+        "dialect": "sqlite",
+    }
+    session_manager.workspace_guardrails[workspace_id] = session_manager.DEFAULT_GUARDRAILS.copy()
+    session_manager.query_history[workspace_id] = [
+        {"id": "remove-this", "question": "Remove this record"},
+        {"id": "keep-this", "question": "Keep this record"},
+    ]
+    session_manager.save(active_workspace_id=workspace_id)
+
+    class FakeMemory:
+        def cleanup(self, intent):
+            return True, 0
+
+    monkeypatch.setattr("apps.core.chat_memory.get_chat_memory", lambda: FakeMemory())
+    try:
+        with TestClient(create_app(include_product=True)) as admin_client:
+            admin_email = "history-admin@business.com"
+            assert admin_client.post(
+                "/api/v1/auth/signup",
+                json=signup_payload(
+                    full_name="History Admin",
+                    email=admin_email,
+                    invite_code=invite.json()["code"],
+                ),
+                headers=csrf_headers(admin_client),
+            ).status_code == 202
+            finish_signup(admin_client, admin_email, otp_codes)
+
+            assert admin_client.delete(
+                f"/api/history/{workspace_id}/records/remove-this",
+                headers=csrf_headers(admin_client),
+            ).status_code == 204
+            assert [r["id"] for r in session_manager.query_history[workspace_id]] == ["keep-this"]
+
+            assert admin_client.delete(
+                f"/api/history/{workspace_id}",
+                headers=csrf_headers(admin_client),
+            ).status_code == 204
+            assert admin_client.get(f"/api/history/{workspace_id}").json() == []
+    finally:
+        session_manager.workspaces.pop(workspace_id, None)
+        session_manager.workspace_guardrails.pop(workspace_id, None)
+        session_manager.query_history.pop(workspace_id, None)

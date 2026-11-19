@@ -9685,7 +9685,7 @@ html[data-theme='light'] .history-loading p {
 
 .settings-page-refined .settings-hero h1 {
   font-size: clamp(3.35rem, 6.4vw, 5.8rem);
-  line-height: 0.84;
+  line-height: 1.05;
   letter-spacing: -0.075em;
 }
 
@@ -9699,6 +9699,19 @@ html[data-theme='light'] .history-loading p {
 .settings-page-refined .settings-flow {
   width: min(100%, 1120px);
   gap: 18px;
+}
+
+/* These cards contain horizontal content; keep them out of the legacy bento
+   columns when there is no workspace administration panel. */
+#root .settings-page-refined .settings-flow:not(:has(.workspace-invite-panel)) > .settings-section {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+/* Reserve the sticky toolbar's space when the page is taller than the shell. */
+.main-content:has(.settings-page-refined) > .app-topbar,
+.main-content:has(.settings-page-refined) > .page-container {
+  flex-shrink: 0;
 }
 
 .settings-page-refined .settings-section {

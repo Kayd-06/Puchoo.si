@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, ArrowRight, Clock3, LoaderCircle, RefreshCw } from 'lucide-react';
+import '../styles/loginVerification.css';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import AuthShell, { Field, inputClass } from '../components/auth/AuthShell';
 import PasswordField from '../components/auth/PasswordField';
@@ -28,9 +30,12 @@ export default function Login() {
   );
   const [errors, setErrors] = useState({});
   const [toast, setToast] = useState('');
-  const [pending, setPending] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const pending = pendingAction !== null;
+  const requestPending = useRef(false);
   const [challengeLeft, setChallengeLeft] = useState(CHALLENGE_SECONDS);
   const [resendLeft, setResendLeft] = useState(RESEND_SECONDS);
+  const resendDeadline = useRef(0);
 
   useEffect(() => {
     if (!toast) return undefined;
@@ -51,25 +56,32 @@ export default function Login() {
 
   useEffect(() => {
     if (step !== 'code') return undefined;
+    const deadline = Date.now() + CHALLENGE_SECONDS * 1000;
+    resendDeadline.current = Date.now() + RESEND_SECONDS * 1000;
     const timer = setInterval(() => {
-      setResendLeft((value) => Math.max(0, value - 1));
-      setChallengeLeft((value) => {
-        if (value <= 1) returnToLogin(LOGIN_EXPIRED);
-        return Math.max(0, value - 1);
-      });
+      // Wall-clock deadlines stay accurate when a background tab throttles timers.
+      setResendLeft(Math.max(0, Math.ceil((resendDeadline.current - Date.now()) / 1000)));
+      const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+      setChallengeLeft(remaining);
+      if (remaining === 0) {
+        clearInterval(timer);
+        returnToLogin(LOGIN_EXPIRED);
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, [step, returnToLogin]);
 
   async function onSubmit(event) {
     event.preventDefault();
+    if (requestPending.current) return;
     const next = {};
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       next.email = 'Enter a valid email address.';
     if (!password) next.password = 'Enter your password.';
     setErrors(next);
     if (Object.keys(next).length) return;
-    setPending(true);
+    requestPending.current = true;
+    setPendingAction('login');
     setToast('');
     try {
       await requestLogin({ email: email.trim().toLowerCase(), password });
@@ -80,18 +92,21 @@ export default function Login() {
     } catch (error) {
       setToast(error.message || 'Invalid email or password');
     } finally {
-      setPending(false);
+      requestPending.current = false;
+      setPendingAction(null);
     }
   }
 
   async function onVerify(event) {
     event.preventDefault();
+    if (requestPending.current || challengeLeft === 0) return;
     const normalizedCode = code.trim();
     if (!/^\d{6}$/.test(normalizedCode)) {
       setErrors({ code: 'Enter the 6-digit email code.' });
       return;
     }
-    setPending(true);
+    requestPending.current = true;
+    setPendingAction('verify');
     setToast('');
     try {
       const authenticatedUser = await verifyLogin({
@@ -123,17 +138,21 @@ export default function Login() {
       }
       setToast(error.message || 'That code is invalid or has expired.');
     } finally {
-      setPending(false);
+      requestPending.current = false;
+      setPendingAction(null);
     }
   }
 
   async function onResend() {
-    setPending(true);
+    if (requestPending.current || resendLeft > 0 || challengeLeft === 0) return;
+    requestPending.current = true;
+    setPendingAction('resend');
     setToast('');
     setErrors({});
     try {
       await resendLoginCode();
       setCode('');
+      resendDeadline.current = Date.now() + RESEND_SECONDS * 1000;
       setResendLeft(RESEND_SECONDS);
       setToast('We sent a new 6-digit code to your email.');
     } catch (error) {
@@ -143,7 +162,8 @@ export default function Login() {
       }
       setToast(error.message || 'Unable to resend the verification code.');
     } finally {
-      setPending(false);
+      requestPending.current = false;
+      setPendingAction(null);
     }
   }
 
@@ -179,23 +199,50 @@ export default function Login() {
               disabled={pending}
               autoFocus
             />
-            <p className="text-sm text-[#3f5474]" role="timer" aria-live="polite">
-              This code expires in {formatClock(challengeLeft)}.
-            </p>
-            <PillButton type="submit" variant="dark" disabled={pending}>
-              {pending ? 'Checking code…' : 'Verify and continue'}
-            </PillButton>
+            <div className="login-verification-actions">
+              <div className="login-verification-expiry">
+                <Clock3 size={17} aria-hidden="true" />
+                <span>Code expires in</span>
+                <strong role="timer" aria-live="off">
+                  {formatClock(challengeLeft)}
+                </strong>
+              </div>
+              <button
+                type="submit"
+                className="login-verification-submit"
+                disabled={pending || challengeLeft === 0}
+              >
+                {pendingAction === 'verify' ? 'Checking code…' : 'Verify and continue'}
+                {pendingAction === 'verify' ? (
+                  <LoaderCircle
+                    size={18}
+                    className="login-verification-spinner"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <ArrowRight size={18} aria-hidden="true" />
+                )}
+              </button>
+              <div className="login-verification-resend-row">
+                <span>Didn’t receive an email?</span>
+                <button
+                  type="button"
+                  className="login-verification-resend"
+                  disabled={pending || resendLeft > 0 || challengeLeft === 0}
+                  onClick={onResend}
+                >
+                  <RefreshCw size={15} aria-hidden="true" />
+                  {pendingAction === 'resend'
+                    ? 'Sending code…'
+                    : resendLeft > 0
+                      ? `Resend code in ${resendLeft}s`
+                      : 'Resend code'}
+                </button>
+              </div>
+            </div>
             <button
               type="button"
-              className={`text-sm text-[#111827] underline-offset-4 hover:underline ${focusRing} rounded-full disabled:opacity-60`}
-              disabled={pending || resendLeft > 0}
-              onClick={onResend}
-            >
-              {resendLeft > 0 ? `Resend code in ${resendLeft}s` : 'Resend code'}
-            </button>
-            <button
-              type="button"
-              className={`ml-4 text-sm text-[#111827] underline-offset-4 hover:underline ${focusRing} rounded-full`}
+              className="login-verification-back"
               disabled={pending}
               onClick={() => {
                 setStep('password');
@@ -204,7 +251,7 @@ export default function Login() {
                 setToast('');
               }}
             >
-              Use a different email
+              <ArrowLeft size={15} aria-hidden="true" /> Use a different email
             </button>
           </form>
         ) : null}

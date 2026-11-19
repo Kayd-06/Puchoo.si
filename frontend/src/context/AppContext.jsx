@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { fetchApi } from '../api/client';
 
 const AppContext = createContext();
@@ -10,17 +10,9 @@ export function AppProvider({ children }) {
   );
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const workspaceRequest = useRef(0);
 
-  const refreshWorkspaces = async () => {
-    const wsData = (await fetchApi('/workspaces/')) || [];
-    setWorkspaces(wsData);
-    setActiveWorkspaceId((currentId) =>
-      wsData.some((workspace) => workspace.id === currentId) ? currentId : wsData[0]?.id || null,
-    );
-    return wsData;
-  };
-
-  const setActiveWorkspaceId = (workspaceIdOrUpdater) => {
+  const setActiveWorkspaceId = useCallback((workspaceIdOrUpdater) => {
     setActiveWorkspaceIdState((currentId) => {
       const nextId =
         typeof workspaceIdOrUpdater === 'function'
@@ -30,11 +22,29 @@ export function AppProvider({ children }) {
       else window.localStorage.removeItem('pucho_active_workspace');
       return nextId;
     });
-  };
+  }, []);
+
+  const refreshWorkspaces = useCallback(async () => {
+    const request = ++workspaceRequest.current;
+    const wsData = (await fetchApi('/workspaces/')) || [];
+    if (request !== workspaceRequest.current) return wsData;
+    setWorkspaces(wsData);
+    setActiveWorkspaceId((currentId) =>
+      wsData.some((workspace) => workspace.id === currentId) ? currentId : wsData[0]?.id || null,
+    );
+    return wsData;
+  }, [setActiveWorkspaceId]);
+
+  // A locally created source wins over any list request that was already in flight.
+  const addWorkspace = useCallback((workspace) => {
+    workspaceRequest.current += 1;
+    setWorkspaces((current) => [...current.filter((item) => item.id !== workspace.id), workspace]);
+  }, []);
 
   // Load initial data
   useEffect(() => {
     const clearUnauthorizedWorkspace = () => {
+      workspaceRequest.current += 1;
       setWorkspaces([]);
       setActiveWorkspaceId(null);
     };
@@ -54,10 +64,29 @@ export function AppProvider({ children }) {
     }
 
     loadInitialData();
-    return () => window.removeEventListener('puchoo:unauthorized', clearUnauthorizedWorkspace);
-    // Load once on entry to the analytics workspace.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    let refreshing = false;
+    const refreshSharedSources = async () => {
+      if (document.hidden || refreshing) return;
+      refreshing = true;
+      try {
+        await refreshWorkspaces();
+      } catch (err) {
+        console.error('Failed to refresh shared data sources', err);
+      } finally {
+        refreshing = false;
+      }
+    };
+    window.addEventListener('focus', refreshSharedSources);
+    document.addEventListener('visibilitychange', refreshSharedSources);
+    const timer = window.setInterval(refreshSharedSources, 30000);
+    return () => {
+      workspaceRequest.current += 1;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshSharedSources);
+      document.removeEventListener('visibilitychange', refreshSharedSources);
+      window.removeEventListener('puchoo:unauthorized', clearUnauthorizedWorkspace);
+    };
+  }, [refreshWorkspaces, setActiveWorkspaceId]);
 
   const getActiveWorkspace = () => {
     return workspaces.find((w) => w.id === activeWorkspaceId) || null;
@@ -66,6 +95,7 @@ export function AppProvider({ children }) {
   const value = {
     workspaces,
     setWorkspaces,
+    addWorkspace,
     activeWorkspaceId,
     setActiveWorkspaceId,
     activeWorkspace: getActiveWorkspace(),

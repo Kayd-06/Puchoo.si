@@ -93,6 +93,7 @@ describe('role-aware product surfaces', () => {
       activeWorkspaceId: null,
       setActiveWorkspaceId: vi.fn(),
       setWorkspaces: vi.fn(),
+      addWorkspace: vi.fn(),
     };
   });
 

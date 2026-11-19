@@ -27,6 +27,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
+import { can } from '../auth/capabilities';
 import TokenUsage from '../components/TokenUsage';
 import { buildCsv, renderReportPdf } from '../utils/reportExport';
 import {
@@ -97,10 +98,17 @@ export default function History() {
   const { user } = useAuth();
   const scope = chatScope(user, activeWorkspaceId);
   const identity = scopeKey(scope);
-  const isViewer = user?.workspace_role === 'viewer';
-  const canManageHistory =
-    !isViewer &&
-    (user?.workspace_role === 'admin' || (!user?.workspace_owner_id && !user?.institute_owner_id));
+  const role =
+    user?.role ||
+    user?.workspace_role ||
+    (user?.workspace_owner_id || user?.institute_owner_id ? 'viewer' : 'owner');
+  const canQuery = user?.capabilities
+    ? can(user, 'query_workspace')
+    : ['owner', 'admin', 'editor'].includes(role);
+  const isViewer = !canQuery;
+  const canManageHistory = user?.capabilities
+    ? can(user, 'administer_workspace')
+    : ['owner', 'admin'].includes(role);
   const currentIdentity = useRef(identity);
   useLayoutEffect(() => {
     currentIdentity.current = identity;
@@ -128,30 +136,54 @@ export default function History() {
 
   useEffect(() => {
     let cancelled = false;
-    const version = clearVersion(scope);
+    let inFlight = false;
+    let loadFailed = false;
     const unsubscribe = subscribeHistoryInvalidation((event) => {
       if (event.tenantId !== scope?.tenantId || event.workspaceId !== scope?.workspaceId) return;
       setHistory((current) =>
         event.recordId == null ? [] : current.filter((record) => record.id !== event.recordId),
       );
     });
-    async function loadHistory() {
-      setError('');
-      setHistory([]);
-      if (!scope) return;
-      setLoading(true);
+    async function loadHistory(initial = false) {
+      if (cancelled || inFlight || !scope) return;
+      inFlight = true;
+      const version = clearVersion(scope);
+      if (initial) {
+        setError('');
+        setHistory([]);
+        setLoading(true);
+      }
       try {
         const data = await fetchApi(`/history/${activeWorkspaceId}`);
-        if (!cancelled) setHistory(filterHistory(scope, data || [], version));
+        if (!cancelled) {
+          setHistory(filterHistory(scope, data || [], version));
+          // Clear only our own load error, never an error from a delete action.
+          if (loadFailed) setError('');
+          loadFailed = false;
+        }
       } catch (err) {
-        if (!cancelled) setError(err.message || 'Could not load query history.');
+        // A failed background refresh keeps the list on screen without an error banner.
+        if (!cancelled && initial) {
+          loadFailed = true;
+          setError(err.message || 'Could not load query history.');
+        }
       } finally {
+        inFlight = false;
         if (!cancelled) setLoading(false);
       }
     }
-    loadHistory();
+    const refreshVisibleHistory = () => {
+      if (!document.hidden) void loadHistory();
+    };
+    loadHistory(true);
+    window.addEventListener('focus', refreshVisibleHistory);
+    document.addEventListener('visibilitychange', refreshVisibleHistory);
+    const timer = window.setInterval(refreshVisibleHistory, 30000);
     return () => {
       cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refreshVisibleHistory);
+      document.removeEventListener('visibilitychange', refreshVisibleHistory);
       unsubscribe();
     };
     // Canonical identity owns this fetch; older identity responses are ignored.
@@ -293,8 +325,8 @@ export default function History() {
           <p>
             {activeWorkspace
               ? isViewer
-                ? `Approved questions for ${activeWorkspace.name}. Your access is view-only.`
-                : `Your recent questions for ${activeWorkspace.name}. Pick one to ask a follow-up.`
+                ? `Workspace questions for ${activeWorkspace.name}. Your access is view-only.`
+                : `Workspace questions for ${activeWorkspace.name}. Pick one to ask a follow-up.`
               : 'Select a database to view its history.'}
           </p>
         </div>
@@ -377,7 +409,7 @@ export default function History() {
               {history.length
                 ? 'Try a different status, or clear your search.'
                 : isViewer
-                  ? 'Approved queries will appear here when a workspace editor runs them.'
+                  ? 'Questions will appear here when the workspace owner, admin, or editor runs them.'
                   : 'Ask your first data question and it will appear here.'}
             </p>
             {history.length > 0 && (

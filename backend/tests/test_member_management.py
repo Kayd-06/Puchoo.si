@@ -266,3 +266,84 @@ def test_role_change_only_touches_membership_in_the_admins_tenant(client, otp_co
         assert owner_id
     finally:
         db.close()
+
+
+def test_admin_cannot_change_own_or_other_member_roles(client, otp_codes):
+    """An admin's management capability must not authorize role reassignment."""
+    _owner_email, admin_code = _create_owner_and_invite(client, otp_codes, role="admin")
+    editor_code = client.post(
+        "/api/v1/auth/workspace/invite", json={"role": "editor"}, headers=csrf_headers(client),
+    ).json()["code"]
+    with TestClient(client.app) as admin_client:
+        assert admin_client.post(
+            "/api/v1/auth/signup",
+            json=signup_payload(email="admin@northstar.com", invite_code=admin_code),
+            headers=csrf_headers(admin_client),
+        ).status_code == 202
+        finish_signup(admin_client, "admin@northstar.com", otp_codes)
+        with TestClient(client.app) as editor_client:
+            assert editor_client.post(
+                "/api/v1/auth/signup",
+                json=signup_payload(email="editor@northstar.com", invite_code=editor_code),
+                headers=csrf_headers(editor_client),
+            ).status_code == 202
+            finish_signup(editor_client, "editor@northstar.com", otp_codes)
+        with database.SessionLocal() as db:
+            admin_id = db.query(User.id).filter_by(email="admin@northstar.com").scalar()
+            editor_id = db.query(User.id).filter_by(email="editor@northstar.com").scalar()
+        for member_id, next_role in [(admin_id, "viewer"), (editor_id, "admin")]:
+            response = admin_client.patch(
+                f"/api/v1/auth/workspace/members/{member_id}",
+                json={"role": next_role}, headers=csrf_headers(admin_client),
+            )
+            assert response.status_code == 403
+        with database.SessionLocal() as db:
+            assert db.get(User, admin_id).workspace_role == "admin"
+            assert db.get(User, editor_id).workspace_role == "editor"
+            assert db.query(TenantMembership).filter_by(user_id=admin_id).one().role == "admin"
+            assert db.query(TenantMembership).filter_by(user_id=editor_id).one().role == "editor"
+
+
+def test_only_owner_can_create_admin_invites_or_remove_admins(client, otp_codes):
+    """Admins could otherwise grant or revoke admin access without the owner."""
+    _owner_email, first_admin_code = _create_owner_and_invite(client, otp_codes, role="admin")
+    with TestClient(client.app) as admin_client:
+        assert admin_client.post(
+            "/api/v1/auth/signup",
+            json=signup_payload(email="admin@northstar.com", invite_code=first_admin_code),
+            headers=csrf_headers(admin_client),
+        ).status_code == 202
+        finish_signup(admin_client, "admin@northstar.com", otp_codes)
+        second_admin_code = client.post(
+            "/api/v1/auth/workspace/invite", json={"role": "admin"}, headers=csrf_headers(client),
+        ).json()["code"]
+        with TestClient(client.app) as second_client:
+            assert second_client.post(
+                "/api/v1/auth/signup",
+                json=signup_payload(email="second-admin@northstar.com", invite_code=second_admin_code),
+                headers=csrf_headers(second_client),
+            ).status_code == 202
+            finish_signup(second_client, "second-admin@northstar.com", otp_codes)
+        with database.SessionLocal() as db:
+            second_id = db.query(User.id).filter_by(email="second-admin@northstar.com").scalar()
+
+        denied_invite = admin_client.post(
+            "/api/v1/auth/workspace/invite", json={"role": "admin"}, headers=csrf_headers(admin_client),
+        )
+        assert denied_invite.status_code == 403
+        assert admin_client.post(
+            "/api/v1/auth/workspace/invite", json={"role": "editor"}, headers=csrf_headers(admin_client),
+        ).status_code == 200
+
+        denied_removal = admin_client.delete(
+            f"/api/v1/auth/workspace/members/{second_id}", headers=csrf_headers(admin_client),
+        )
+        assert denied_removal.status_code == 403
+        with database.SessionLocal() as db:
+            assert db.get(User, second_id).workspace_role == "admin"
+
+        assert client.delete(
+            f"/api/v1/auth/workspace/members/{second_id}", headers=csrf_headers(client),
+        ).status_code == 204
+        with database.SessionLocal() as db:
+            assert db.get(User, second_id).workspace_owner_id is None
