@@ -33,6 +33,16 @@ def block_outbound_smtp(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def reset_shared_source_refresh_throttle():
+    """The source-refresh throttle is process global; tests must not inherit it."""
+    from apps.api.session import session_manager
+
+    session_manager._init_refresh_state()
+    yield
+    session_manager._init_refresh_state()
+
+
+@pytest.fixture(autouse=True)
 def reset_rate_limiters_after_each_test():
     """Rate-limit counters are process global, so no test may leak them onward."""
     yield

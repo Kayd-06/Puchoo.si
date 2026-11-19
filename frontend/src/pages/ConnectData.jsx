@@ -155,22 +155,22 @@ export default function ConnectData() {
   return (
     <div className="connect-page">
       <section className="connect-stage">
-        <svg
-          className="connect-word"
-          viewBox="0 0 1200 260"
-          preserveAspectRatio="xMidYMid meet"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <text x="600" y="198" textAnchor="middle" pointerEvents="stroke">
-            {displayWord}
-          </text>
-        </svg>
         <header className="connect-stage-header">
           <span>Data sources</span>
           <span>Owner and admin access</span>
         </header>
         <div className="connect-stage-content">
+          <svg
+            className="connect-word"
+            viewBox="0 0 1200 360"
+            preserveAspectRatio="xMidYMid meet"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <text x="600" y="270" textAnchor="middle" pointerEvents="stroke">
+              {displayWord}
+            </text>
+          </svg>
           <div className="connect-tablist" role="tablist" aria-label="Data source type">
             <button
               type="button"

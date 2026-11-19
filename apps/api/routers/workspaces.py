@@ -145,7 +145,7 @@ def list_workspaces(user=Depends(require_capability("view_workspaces"))) -> List
     owner_id = _owner_id(user)
     return [
         _public_workspace(workspace)
-        for workspace in session_manager.list_workspaces()
+        for workspace in session_manager.list_tenant_workspaces(owner_id)
         if workspace.get("owner_user_id") == owner_id
     ]
 

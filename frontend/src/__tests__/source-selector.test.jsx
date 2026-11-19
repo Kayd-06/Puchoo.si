@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -20,6 +20,7 @@ vi.mock('../context/ThemeContext', () => ({
 vi.mock('../components/ThemeToggle', () => ({ default: () => null }));
 vi.mock('../api/client', () => ({ fetchApi: vi.fn(), fetchApiBlob: vi.fn() }));
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
   document.querySelectorAll('[data-sidebar-test-styles]').forEach((style) => style.remove());

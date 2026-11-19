@@ -1,0 +1,194 @@
+/* Settings owns a complete palette, including nested upload and member controls. */
+.settings-page {
+  --settings-surface: #111110;
+  --settings-card: #1b1b19;
+  --settings-tint: #2c2b26;
+  --settings-line: #45443e;
+  --settings-text: #f3f0e8;
+  --settings-muted: #b7b3a9;
+  --settings-accent: #ece6d9;
+  --settings-primary: #ece6d9;
+  --settings-on-primary: #24231f;
+  --settings-danger: #ffb6bf;
+  --settings-danger-bg: #38232e;
+}
+html[data-theme='light'] .settings-page {
+  --settings-surface: #f8fafc;
+  --settings-card: #ffffff;
+  --settings-tint: #e8eef5;
+  --settings-line: #cdd3db;
+  --settings-text: #27313d;
+  --settings-muted: #566270;
+  --settings-accent: #3f5f86;
+  --settings-primary: #3f5f86;
+  --settings-on-primary: #ffffff;
+  --settings-danger: #a72c44;
+  --settings-danger-bg: #fff0f2;
+}
+#root .app-container .settings-page .account-profile-refined {
+  --profile-bg: var(--settings-surface);
+  --profile-card: var(--settings-card);
+  --profile-line: var(--settings-line);
+  --profile-text: var(--settings-text);
+  --profile-muted: var(--settings-muted);
+  --profile-accent: var(--settings-accent);
+  --profile-tint: var(--settings-tint);
+}
+#root .app-container .settings-page .workspace-invite-refined {
+  --invite-bg: var(--settings-surface);
+  --invite-card: var(--settings-card);
+  --invite-line: var(--settings-line);
+  --invite-text: var(--settings-text);
+  --invite-muted: var(--settings-muted);
+  --invite-accent: var(--settings-accent);
+  --invite-tint: var(--settings-tint);
+  --invite-button: var(--settings-primary);
+  --invite-button-text: var(--settings-on-primary);
+}
+#root .app-container .settings-page .workspace-members-refined {
+  --member-bg: var(--settings-surface);
+  --member-card: var(--settings-card);
+  --member-line: var(--settings-line);
+  --member-fg: var(--settings-text);
+  --member-muted: var(--settings-muted);
+  --member-accent: var(--settings-accent);
+  --member-accent-bg: var(--settings-tint);
+  --member-danger: var(--settings-danger);
+  --member-danger-bg: var(--settings-danger-bg);
+}
+#root .app-container .settings-page .session-history-refined {
+  --history-card-bg: var(--settings-surface);
+  --history-card-line: var(--settings-line);
+  --history-card-text: var(--settings-text);
+  --history-card-muted: var(--settings-muted);
+  --history-card-accent: var(--settings-accent);
+  --history-card-tint: var(--settings-tint);
+}
+#root .app-container .settings-page .settings-photo-editor {
+  border: 1px solid var(--settings-line);
+  border-radius: 14px;
+  background: var(--settings-card);
+  color: var(--settings-text);
+  box-shadow: none;
+}
+#root .app-container .settings-page .settings-profile-identity p > span {
+  color: var(--settings-muted);
+}
+#root .app-container .settings-page .settings-photo-editor-head,
+#root .app-container .settings-page .settings-photo-actions {
+  background: var(--settings-surface);
+  color: var(--settings-text);
+  border-color: var(--settings-line);
+}
+#root .app-container .settings-page .settings-photo-editor-head {
+  align-items: center;
+  border-bottom: 1px solid var(--settings-line);
+  padding: 18px;
+}
+#root .app-container .settings-page .settings-photo-editor-head h3,
+#root .app-container .settings-page .settings-photo-source strong {
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .settings-photo-source strong {
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+#root .app-container .settings-page .settings-photo-source p,
+#root .app-container .settings-page .settings-photo-editor .settings-section-kicker {
+  color: var(--settings-muted);
+}
+#root .app-container .settings-page .settings-photo-source p {
+  font-size: 0.76rem;
+  line-height: 1.65;
+  margin: 6px 0 14px;
+}
+#root .app-container .settings-page .settings-photo-workspace {
+  background: var(--settings-card);
+  padding: 20px 18px;
+  gap: 18px;
+}
+#root .app-container .settings-page .settings-photo-preview {
+  background: var(--settings-tint);
+  color: var(--settings-muted);
+  border-color: var(--settings-line);
+  border-radius: 16px;
+}
+#root .app-container .settings-page .settings-photo-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#root .app-container .settings-page .settings-photo-close {
+  background: transparent;
+  color: var(--settings-muted);
+  border-color: transparent;
+  flex-shrink: 0;
+}
+#root .app-container .settings-page .settings-photo-close:hover {
+  background: var(--settings-tint);
+  color: var(--settings-text);
+  border-color: var(--settings-line);
+}
+#root .app-container .settings-page .settings-action-primary {
+  background: var(--settings-primary);
+  color: var(--settings-on-primary);
+  border-color: var(--settings-primary);
+}
+#root .app-container .settings-page .settings-action-primary:hover:not(:disabled) {
+  background: var(--settings-accent);
+  color: var(--settings-on-primary);
+  filter: brightness(0.94);
+}
+#root .app-container .settings-page .settings-photo-remove {
+  color: var(--settings-danger);
+  background: transparent;
+  padding: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-height: 38px;
+}
+#root .app-container .settings-page .settings-photo-remove:hover:not(:disabled) {
+  color: var(--settings-danger);
+  background: var(--settings-danger-bg);
+  border-color: var(--settings-danger);
+}
+#root .app-container .settings-page .settings-photo-error {
+  color: var(--settings-danger);
+  background: var(--settings-danger-bg);
+  border: 1px solid var(--settings-danger);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.76rem;
+  line-height: 1.6;
+}
+#root .app-container .settings-page .settings-photo-actions {
+  flex-wrap: wrap;
+  padding: 14px 18px;
+  gap: 8px;
+}
+#root .app-container .settings-page button:disabled {
+  opacity: 1;
+  background: var(--settings-tint);
+  color: var(--settings-muted);
+  border-color: var(--settings-line);
+  cursor: not-allowed;
+  filter: none;
+}
+#root .app-container .settings-page :is(button, input):focus-visible {
+  outline: 2px solid var(--settings-accent);
+  outline-offset: 3px;
+}
+@media (max-width: 520px) {
+  #root .app-container .settings-page .settings-photo-workspace {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  #root .app-container .settings-page .settings-photo-actions .settings-action {
+    flex: 1;
+  }
+  #root .app-container .settings-page .settings-photo-remove {
+    flex: 1 0 100%;
+    justify-content: center;
+    margin: 0;
+  }
+}

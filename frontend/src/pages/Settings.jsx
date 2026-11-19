@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import '../styles/accountProfile.css';
 import '../styles/sessionHistory.css';
+import '../styles/settingsTheme.css';
 import {
   Camera,
   Check,

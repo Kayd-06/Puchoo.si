@@ -289,16 +289,25 @@ def test_members_read_owner_history_only_inside_their_tenant(app, monkeypatch, r
     own_source = {'id': 'shared-source', 'name': 'Owner source', 'owner_user_id': owner_id}
     foreign_source = {'id': 'foreign-source', 'name': 'Other source', 'owner_user_id': 'other-owner'}
     owner_question = {'id': 'owner-record', 'question': 'Owner question', 'actor_user_id': owner_id}
+    from backend import database
+    from backend.workspace_repository import WorkspaceRepository
+    with database.SessionLocal() as db:
+        for tenant_id in (owner_id, 'other-owner'):
+            db.add(User(id=tenant_id, full_name=tenant_id, email=f'{tenant_id}@example.com',
+                        password_hash='unused', workspace_type=workspace_type, workspace_role='owner'))
+        db.commit()
+        repository = WorkspaceRepository(db)
+        for source in (own_source, foreign_source):
+            tenant_id = source['owner_user_id']
+            repository.ensure_tenant(tenant_id, tenant_id, name='Team', workspace_type=workspace_type)
+            repository.save_workspace(source, tenant_id)
+        repository.save_history('shared-source', [owner_question])
+        db.commit()
     product = create_app(include_product=True)
     product.dependency_overrides[current_user] = lambda: member
     with TestClient(product) as member_client:
-        monkeypatch.setattr(session_manager, 'workspaces', {
-            'shared-source': own_source, 'foreign-source': foreign_source,
-        })
-        monkeypatch.setattr(session_manager, 'query_history', {
-            'shared-source': [owner_question],
-            'foreign-source': [{'id': 'private-record', 'question': 'Private question'}],
-        })
+        monkeypatch.setattr(session_manager, 'workspaces', {})
+        monkeypatch.setattr(session_manager, 'query_history', {})
         sources = member_client.get('/api/workspaces/').json()
         assert [source['id'] for source in sources] == ['shared-source']
         history = member_client.get('/api/history/shared-source')

@@ -49,7 +49,14 @@ npm run dev:backend
 npm run dev:frontend
 ```
 
-The backend launcher detects `.venv` (or the legacy Windows `venv` directory). On macOS/Linux it falls back to `python3` if `.venv` is absent. Backend startup applies Alembic migrations. For a manual migration with the virtual environment activated:
+The backend launcher detects `.venv` or the legacy `venv` directory on Windows, macOS, and Linux. Without either environment, it falls back to `python` on Windows or `python3` on macOS/Linux. The authentication test command uses the same interpreter selection and accepts additional pytest arguments:
+
+```bash
+npm run test:auth
+npm run test:auth -- -k workspace
+```
+
+Backend startup applies Alembic migrations. For a manual migration with the virtual environment activated:
 
 ```bash
 python -m alembic -c backend/alembic.ini upgrade head

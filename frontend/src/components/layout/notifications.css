@@ -1,28 +1,43 @@
+/* Complete surface/foreground pairs prevent legacy blue and warm palettes mixing. */
+.topbar-menu-anchor {
+  --notification-surface: #101010;
+  --notification-text: #f2f2f2;
+  --notification-muted: #b0b0b0;
+  --notification-line: #383838;
+  --notification-unread: #202020;
+  --notification-hover: #2b2b2b;
+  --notification-accent: #e8e2d6;
+  --notification-danger: #ffb6bf;
+  --notification-danger-bg: #38232b;
+}
+html[data-theme='light'] .topbar-menu-anchor {
+  --notification-surface: #ffffff;
+  --notification-text: #27313d;
+  --notification-muted: #566270;
+  --notification-line: #d8dfe7;
+  --notification-unread: #edf2f8;
+  --notification-hover: #e4ebf3;
+  --notification-accent: #3f5f86;
+  --notification-danger: #a72c44;
+  --notification-danger-bg: #fff0f2;
+}
 #root .app-container button.notification-bell-button {
   position: relative;
-  width: 32px;
-  min-width: 32px;
-  height: 32px;
-  min-height: 32px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: #c5d1df;
+  color: var(--notification-muted);
   box-shadow: none;
 }
 #root .app-container button.notification-bell-button:hover,
 #root .app-container button.notification-bell-button.is-active {
-  background: #253445;
-  color: #f0f5fa;
-}
-html[data-theme='light'] #root .app-container button.notification-bell-button {
-  color: #45423b;
-}
-html[data-theme='light'] #root .app-container button.notification-bell-button:hover,
-html[data-theme='light'] #root .app-container button.notification-bell-button.is-active {
-  background: #efece5;
-  color: #2d2a23;
+  background: var(--notification-hover);
+  color: var(--notification-text);
 }
 #root .notification-bell-button .topbar-notification-count {
   position: absolute;
@@ -32,14 +47,10 @@ html[data-theme='light'] #root .app-container button.notification-bell-button.is
   min-width: 8px;
   height: 8px;
   padding: 0;
-  border: 2px solid #111b25;
+  border: 2px solid var(--bg-surface);
   border-radius: 50%;
-  background: #fa415b;
+  background: #e54861;
   box-sizing: content-box;
-}
-html[data-theme='light'] #root .notification-bell-button .topbar-notification-count {
-  border-color: #f2f4f6;
-  background: #e52945;
 }
 .notification-sr-only {
   position: absolute;
@@ -51,84 +62,158 @@ html[data-theme='light'] #root .notification-bell-button .topbar-notification-co
   clip-path: inset(50%);
   white-space: nowrap;
 }
-#root .topbar-notification-panel {
-  background: #14212d;
-  color: #eef4fa;
-  border-color: #344657;
+html[data-theme] #root .app-container .topbar-notification-panel {
+  width: min(390px, calc(100vw - 32px));
+  background: var(--notification-surface);
+  color: var(--notification-text);
+  border: 1px solid var(--notification-line);
+  border-radius: 18px;
+  box-shadow: 0 18px 54px #00000038;
 }
-#root .notification-row {
+#root .app-container .topbar-notification-panel .topbar-popover-header {
+  padding: 18px 16px 14px;
+  border-color: var(--notification-line);
+  gap: 12px;
+}
+#root .app-container .topbar-notification-panel .topbar-popover-header span {
+  color: var(--notification-muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}
+#root .app-container .topbar-notification-panel .topbar-popover-header strong {
+  color: var(--notification-text);
+  font-size: 1rem;
+  margin-top: 4px;
+}
+#root .app-container .topbar-notification-panel .topbar-text-button {
+  flex-shrink: 0;
+  color: var(--notification-accent);
+  padding: 8px;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.7rem;
+}
+#root .app-container .topbar-notification-panel .topbar-text-button:hover {
+  background: var(--notification-hover);
+}
+#root .app-container .topbar-notification-panel .topbar-notification-list {
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  max-height: min(440px, 60dvh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--notification-line) transparent;
+}
+#root .app-container .topbar-notification-panel .notification-row {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid #30404f;
+  gap: 4px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
 }
-#root .notification-row .topbar-notification-item {
+#root .app-container .topbar-notification-panel .notification-row.is-unread {
+  background: var(--notification-unread);
+  border-color: var(--notification-line);
+}
+#root .app-container .topbar-notification-panel .notification-row:hover {
+  background: var(--notification-hover);
+}
+#root .app-container .topbar-notification-panel .topbar-notification-item {
   flex: 1;
   min-width: 0;
+  padding: 13px 8px 13px 12px;
   border: 0;
+  border-radius: 10px;
   background: transparent;
-  color: #edf3f9;
+  color: var(--notification-text);
+  box-shadow: none;
+  text-align: left;
 }
-#root .notification-row .topbar-notification-item p,
-#root .notification-row .topbar-notification-item span {
-  color: #a6b8c9;
+#root .app-container .topbar-notification-panel .topbar-notification-item > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
 }
-#root .notification-row .topbar-notification-item.is-unread {
-  background: #1b3040;
+#root .app-container .topbar-notification-panel .topbar-notification-item strong {
+  color: var(--notification-text);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
-#root .notification-delete {
+#root
+  .app-container
+  .topbar-notification-panel
+  .is-unread
+  .topbar-notification-item
+  strong::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin: 0 7px 2px 0;
+  border-radius: 50%;
+  background: var(--notification-accent);
+}
+#root .app-container .topbar-notification-panel .topbar-notification-item time {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 0.65rem;
+  color: var(--notification-muted);
+}
+#root .app-container .topbar-notification-panel .topbar-notification-item p {
+  margin: 5px 0 0;
+  color: var(--notification-muted);
+  font-size: 0.75rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+#root .app-container .topbar-notification-panel .notification-delete {
   display: grid;
   place-items: center;
-  flex: 0 0 30px;
-  width: 30px;
-  height: 30px;
+  flex: 0 0 34px;
+  width: 34px;
+  min-height: 34px;
   padding: 0;
-  margin: 0 10px 0 4px;
-  color: #ffb1bf;
+  margin-right: 6px;
+  color: var(--notification-muted);
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
   cursor: pointer;
 }
-#root .notification-delete:hover {
-  background: #492734;
-  border-color: #995166;
+#root .app-container .topbar-notification-panel .notification-delete:hover {
+  color: var(--notification-danger);
+  background: var(--notification-danger-bg);
 }
-#root .notification-delete:disabled {
+#root .app-container .topbar-notification-panel .notification-delete:disabled {
   opacity: 0.5;
   cursor: wait;
 }
-#root .notification-error {
-  color: #ffb1bf;
-  padding: 10px 16px;
-  font-size: 0.78rem;
+#root .app-container .topbar-notification-panel button:focus-visible {
+  outline: 2px solid var(--notification-accent);
+  outline-offset: -2px;
 }
-html[data-theme='light'] #root .topbar-notification-panel {
-  background: #f2f4f6;
-  color: #35322b;
-  border-color: #e4e1da;
+#root .app-container .topbar-notification-panel .topbar-empty-state {
+  padding: 28px 18px;
+  text-align: center;
+  color: var(--notification-muted);
+  line-height: 1.6;
 }
-html[data-theme='light'] #root .notification-row {
-  border-color: #ebe8e1;
+#root .app-container .topbar-notification-panel .notification-error {
+  color: var(--notification-danger);
+  background: var(--notification-danger-bg);
+  padding: 10px 12px;
+  margin: 8px;
+  border-radius: 8px;
+  font-size: 0.75rem;
 }
-html[data-theme='light'] #root .notification-row .topbar-notification-item {
-  color: #35322b;
-}
-html[data-theme='light'] #root .notification-row .topbar-notification-item p,
-html[data-theme='light'] #root .notification-row .topbar-notification-item span {
-  color: #6b6861;
-}
-html[data-theme='light'] #root .notification-row .topbar-notification-item.is-unread {
-  background: #e5e9ee;
-}
-html[data-theme='light'] #root .notification-delete,
-html[data-theme='light'] #root .notification-error {
-  color: #ab304c;
-}
-html[data-theme='light'] #root .notification-delete:hover {
-  background: #ffedf1;
-  border-color: #e6b7c2;
-}
-#root .notification-delete:focus-visible {
-  outline: 2px solid #689dd6;
-  outline-offset: 2px;
+@media (max-width: 520px) {
+  #root .app-container .topbar-notification-panel .notification-delete {
+    flex-basis: 40px;
+    width: 40px;
+    min-height: 40px;
+  }
 }

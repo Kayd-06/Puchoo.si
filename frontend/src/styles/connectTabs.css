@@ -1,3 +1,32 @@
+/* Reserve a separate row for the outline so headings and tabs never mask it. */
+#root .app-container .connect-page .connect-stage-content {
+  align-content: start;
+  padding-top: clamp(20px, 4vh, 48px);
+}
+#root .app-container .connect-page .connect-word {
+  position: relative;
+  inset: auto;
+  display: block;
+  justify-self: center;
+  width: min(100%, 740px);
+  height: auto;
+  aspect-ratio: 1200 / 360;
+  margin: 0 auto 18px;
+  overflow: visible;
+}
+#root .app-container .connect-page .connect-word text {
+  font:
+    500 260px Arial,
+    Helvetica,
+    sans-serif;
+  letter-spacing: -0.06em;
+}
+@media (max-width: 520px) {
+  #root .app-container .connect-page .connect-word {
+    margin-bottom: 14px;
+  }
+}
+
 /* A compact segmented control; geometry is shared by both themes. */
 #root .app-container .connect-page .connect-tablist {
   --tab-track: #0b0b0b;
