@@ -34,7 +34,11 @@ export default function ResultCharts({ record, presentation = {}, config, onConf
       <header className="result-chart-dashboard-heading">
         <div>
           <h2>Visualizations</h2>
-          <p>Three views of your results</p>
+          <p>
+            {initial.aggregation === 'count'
+              ? 'Category counts from the returned rows'
+              : 'Three views of your results'}
+          </p>
         </div>
         <span className="result-chart-row-count">{record.rows.length.toLocaleString()} rows</span>
       </header>

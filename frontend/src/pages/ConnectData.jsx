@@ -40,6 +40,17 @@ export default function ConnectData() {
   const [connecting, setConnecting] = useState(false);
   const [serverError, setServerError] = useState('');
 
+  const sourceWord =
+    uploading || connecting
+      ? 'SYNC'
+      : createdWorkspace
+        ? 'READY'
+        : activeTab === 'server'
+          ? 'LINK'
+          : selectedFiles.length
+            ? 'READY'
+            : 'DATA';
+
   if (!can(user, 'manage_data_sources')) {
     return (
       <section className="connect-viewer-state">
@@ -59,7 +70,11 @@ export default function ConnectData() {
 
   const selectFiles = (files) => {
     const incoming = Array.from(files || []);
-    if (!incoming.length) return;
+    if (!incoming.length || uploading) return;
+    if (incoming.length > 20 || incoming.some((file) => !/\.(csv|xlsx)$/i.test(file.name))) {
+      setUploadError('Choose up to 20 CSV or XLSX files.');
+      return;
+    }
     setSelectedFiles(incoming);
     setUploadError('');
     setCreatedWorkspace(null);
@@ -144,14 +159,6 @@ export default function ConnectData() {
     }
   };
 
-  const displayWord = uploading
-    ? 'SYNC'
-    : selectedFiles.length
-      ? 'READY'
-      : activeTab === 'server'
-        ? 'LINK'
-        : 'DATA';
-
   return (
     <div className="connect-page">
       <section className="connect-stage">
@@ -160,238 +167,252 @@ export default function ConnectData() {
           <span>Owner and admin access</span>
         </header>
         <div className="connect-stage-content">
-          <svg
-            className="connect-word"
-            viewBox="0 0 1200 360"
-            preserveAspectRatio="xMidYMid meet"
-            aria-hidden="true"
-            focusable="false"
-          >
-            <text x="600" y="270" textAnchor="middle" pointerEvents="stroke">
-              {displayWord}
-            </text>
-          </svg>
-          <div className="connect-tablist" role="tablist" aria-label="Data source type">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'upload'}
-              className={activeTab === 'upload' ? 'is-active' : ''}
-              onClick={() => setActiveTab('upload')}
-            >
-              <Upload size={15} /> Upload files
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'server'}
-              className={activeTab === 'server' ? 'is-active' : ''}
-              onClick={() => setActiveTab('server')}
-            >
-              <Server size={15} /> Connect server
-            </button>
-          </div>
-
-          {createdWorkspace ? (
-            <div className="connect-complete" role="status">
+          <aside className="connect-intro">
+            <span className="connect-eyebrow">YOUR KNOWLEDGE, CONNECTED</span>
+            <div className="connect-signal" data-state={sourceWord} aria-hidden="true">
+              <span key={sourceWord} className="connect-signal-word">
+                {sourceWord}
+              </span>
+            </div>
+            <h2>
+              A clear path
+              <br />
+              to better answers.
+            </h2>
+            <p>
+              Bring your files or connect a database. Your next insight starts with a trusted
+              source.
+            </p>
+            <div className="connect-trust-item">
+              <ShieldCheck size={19} />
               <div>
-                <Check size={22} />
+                <strong>Private by design</strong>
+                <span>Data stays within your workspace.</span>
               </div>
-              <span>Workspace ready</span>
-              <h1>{createdWorkspace.name}</h1>
-              <p>Your source is now isolated and available for verified, read-only analysis.</p>
-              <Link to="/ask" className="ui-action ui-action-primary">
-                Ask your data <ArrowUpRight size={17} />
-              </Link>
-              <button type="button" onClick={() => setCreatedWorkspace(null)}>
-                Add another source
-              </button>
             </div>
-          ) : activeTab === 'upload' ? (
-            <div className="connect-upload-flow">
-              <h1>
-                Bring your data
-                <br />
-                into focus.
-              </h1>
-              <p>
-                Upload CSV or Excel files, up to 20 at once. Puchoo.si builds one private, queryable
-                workspace without mutating the source.
-              </p>
-              <input
-                id="fileUpload"
-                type="file"
-                multiple
-                accept={ACCEPTED_FILES}
-                onChange={(event) => selectFiles(event.target.files)}
-                hidden
-              />
-              <label
-                htmlFor="fileUpload"
-                className={`connect-dropzone${isDragging ? ' is-dragging' : ''}${uploading ? ' is-uploading' : ''}`}
-                onDragOver={(event) => {
-                  event.preventDefault();
-                  setIsDragging(true);
-                }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={(event) => {
-                  event.preventDefault();
-                  setIsDragging(false);
-                  selectFiles(event.dataTransfer.files);
-                }}
+            <div className="connect-trust-item">
+              <FileSpreadsheet size={19} />
+              <div>
+                <strong>Ready for questions</strong>
+                <span>Turn structured data into useful answers.</span>
+              </div>
+            </div>
+            <div className="connect-intro-note">
+              READ-ONLY ANALYSIS<span>Your source data stays unchanged.</span>
+            </div>
+          </aside>
+          <div className="connect-workbench">
+            <div className="connect-tablist" role="tablist" aria-label="Data source type">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'upload'}
+                className={activeTab === 'upload' ? 'is-active' : ''}
+                onClick={() => setActiveTab('upload')}
               >
-                <div className="connect-dropzone-mark">
-                  <Upload size={23} />
-                </div>
-                <strong>
-                  {uploading
-                    ? 'Creating isolated workspace…'
-                    : selectedFiles.length
-                      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
-                      : 'Drop files here'}
-                </strong>
-                <span>
-                  {uploading
-                    ? 'Validating structure and access boundaries'
-                    : 'or browse from your device'}
-                </span>
-              </label>
-
-              {selectedFiles.length > 0 && !uploading && (
-                <div className="connect-selected-files">
-                  <div>
-                    {selectedFiles.map((file) => (
-                      <span key={`${file.name}-${file.size}`}>
-                        <FileSpreadsheet size={14} />
-                        <span className="connect-file-name">{fileLabel(file)}</span>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedFiles((current) => current.filter((item) => item !== file))
-                          }
-                          aria-label={`Remove ${file.name}`}
-                        >
-                          <X size={14} />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                  <input
-                    value={workspaceName}
-                    onChange={(event) => setWorkspaceName(event.target.value)}
-                    placeholder="Name this workspace (optional)"
-                    aria-label="Workspace name"
-                  />
-                  <button type="button" className="connect-submit" onClick={uploadFiles}>
-                    Create workspace <ArrowUpRight size={17} />
-                  </button>
-                </div>
-              )}
-              {uploadError && (
-                <p className="connect-error" role="alert">
-                  {uploadError}
-                </p>
-              )}
-            </div>
-          ) : (
-            <form className="connect-server-form" onSubmit={connectServer} noValidate>
-              <h1>
-                Connect a<br />
-                trusted source.
-              </h1>
-              <p>
-                Use a restricted database user. Puchoo.si validates every connection in read-only
-                mode.
-              </p>
-              <div className="connect-server-grid">
-                <label>
-                  Workspace name
-                  <input
-                    type="text"
-                    placeholder="Workspace name"
-                    value={serverForm.name}
-                    onChange={(event) => updateServerForm('name', event.target.value)}
-                  />
-                </label>
-                <label>
-                  Database engine
-                  <select
-                    value={serverForm.engine}
-                    onChange={(event) => {
-                      const engine = event.target.value;
-                      updateServerForm('engine', engine);
-                      updateServerForm('port', engine === 'mysql' ? '3306' : '5432');
-                    }}
-                    aria-label="Database engine"
-                  >
-                    <option value="postgresql">PostgreSQL</option>
-                    <option value="mysql">MySQL</option>
-                  </select>
-                </label>
-                <label>
-                  Server host
-                  <input
-                    type="text"
-                    placeholder="Host (db.example.com)"
-                    value={serverForm.host}
-                    onChange={(event) => updateServerForm('host', event.target.value)}
-                  />
-                </label>
-                <label>
-                  Database port
-                  <input
-                    type="number"
-                    placeholder="Port"
-                    min="1"
-                    max="65535"
-                    value={serverForm.port}
-                    onChange={(event) => updateServerForm('port', event.target.value)}
-                    aria-label="Database port"
-                  />
-                </label>
-                <label>
-                  Database name
-                  <input
-                    type="text"
-                    placeholder="Database name"
-                    value={serverForm.database}
-                    onChange={(event) => updateServerForm('database', event.target.value)}
-                  />
-                </label>
-                <label>
-                  Read-only username
-                  <input
-                    type="text"
-                    placeholder="Read-only username"
-                    autoComplete="username"
-                    value={serverForm.username}
-                    onChange={(event) => updateServerForm('username', event.target.value)}
-                  />
-                </label>
-                <label>
-                  Password
-                  <input
-                    type="password"
-                    placeholder="Password"
-                    autoComplete="current-password"
-                    value={serverForm.password}
-                    onChange={(event) => updateServerForm('password', event.target.value)}
-                  />
-                </label>
-              </div>
-              <label className="connect-ssl">
-                <input type="checkbox" checked readOnly disabled /> TLS is required by the server
-              </label>
-              {serverError && (
-                <p className="connect-error" role="alert">
-                  {serverError}
-                </p>
-              )}
-              <button type="submit" className="connect-submit" disabled={connecting}>
-                {connecting ? 'Checking connection…' : 'Connect source'} <ArrowUpRight size={17} />
+                <Upload size={15} /> Upload files
               </button>
-            </form>
-          )}
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === 'server'}
+                className={activeTab === 'server' ? 'is-active' : ''}
+                onClick={() => setActiveTab('server')}
+              >
+                <Server size={15} /> Connect server
+              </button>
+            </div>
+
+            {createdWorkspace ? (
+              <div className="connect-complete" role="status">
+                <div>
+                  <Check size={22} />
+                </div>
+                <span>Workspace ready</span>
+                <h1>{createdWorkspace.name}</h1>
+                <p>Your source is now isolated and available for verified, read-only analysis.</p>
+                <Link to="/ask" className="ui-action ui-action-primary">
+                  Ask your data <ArrowUpRight size={17} />
+                </Link>
+                <button type="button" onClick={() => setCreatedWorkspace(null)}>
+                  Add another source
+                </button>
+              </div>
+            ) : activeTab === 'upload' ? (
+              <div className="connect-upload-flow">
+                <h1>Upload your data</h1>
+                <p>Upload CSV or Excel files, up to 20 at once.</p>
+                <input
+                  id="fileUpload"
+                  type="file"
+                  multiple
+                  accept={ACCEPTED_FILES}
+                  onChange={(event) => selectFiles(event.target.files)}
+                  disabled={uploading}
+                  className="connect-file-input"
+                />
+                <label
+                  htmlFor="fileUpload"
+                  className={`connect-dropzone${isDragging ? ' is-dragging' : ''}${uploading ? ' is-uploading' : ''}`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setIsDragging(true);
+                  }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setIsDragging(false);
+                    selectFiles(event.dataTransfer.files);
+                  }}
+                >
+                  <div className="connect-dropzone-mark">
+                    <Upload size={23} />
+                  </div>
+                  <strong>
+                    {uploading
+                      ? 'Creating isolated workspace…'
+                      : selectedFiles.length
+                        ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
+                        : 'Drop files here'}
+                  </strong>
+                  <span>
+                    {uploading
+                      ? 'Validating structure and access boundaries'
+                      : 'or browse from your device'}
+                  </span>
+                </label>
+
+                {selectedFiles.length > 0 && !uploading && (
+                  <div className="connect-selected-files">
+                    <div>
+                      {selectedFiles.map((file) => (
+                        <span key={`${file.name}-${file.size}`}>
+                          <FileSpreadsheet size={14} />
+                          <span className="connect-file-name">{fileLabel(file)}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setSelectedFiles((current) => current.filter((item) => item !== file))
+                            }
+                            aria-label={`Remove ${file.name}`}
+                          >
+                            <X size={14} />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                    <input
+                      value={workspaceName}
+                      onChange={(event) => setWorkspaceName(event.target.value)}
+                      placeholder="Name this workspace (optional)"
+                      aria-label="Workspace name"
+                    />
+                    <button type="button" className="connect-submit" onClick={uploadFiles}>
+                      Create workspace <ArrowUpRight size={17} />
+                    </button>
+                  </div>
+                )}
+                {uploadError && (
+                  <p className="connect-error" role="alert">
+                    {uploadError}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <form className="connect-server-form" onSubmit={connectServer} noValidate>
+                <h1>Connect your database</h1>
+                <p>Link PostgreSQL or MySQL using a read-only database user.</p>
+                <div className="connect-server-grid">
+                  <label>
+                    Workspace name
+                    <input
+                      type="text"
+                      placeholder="Workspace name"
+                      value={serverForm.name}
+                      onChange={(event) => updateServerForm('name', event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Database engine
+                    <select
+                      value={serverForm.engine}
+                      onChange={(event) => {
+                        const engine = event.target.value;
+                        updateServerForm('engine', engine);
+                        updateServerForm('port', engine === 'mysql' ? '3306' : '5432');
+                      }}
+                      aria-label="Database engine"
+                    >
+                      <option value="postgresql">PostgreSQL</option>
+                      <option value="mysql">MySQL</option>
+                    </select>
+                  </label>
+                  <label>
+                    Server host
+                    <input
+                      type="text"
+                      placeholder="Host (db.example.com)"
+                      value={serverForm.host}
+                      onChange={(event) => updateServerForm('host', event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Database port
+                    <input
+                      type="number"
+                      placeholder="Port"
+                      min="1"
+                      max="65535"
+                      value={serverForm.port}
+                      onChange={(event) => updateServerForm('port', event.target.value)}
+                      aria-label="Database port"
+                    />
+                  </label>
+                  <label>
+                    Database name
+                    <input
+                      type="text"
+                      placeholder="Database name"
+                      value={serverForm.database}
+                      onChange={(event) => updateServerForm('database', event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Read-only username
+                    <input
+                      type="text"
+                      placeholder="Read-only username"
+                      autoComplete="username"
+                      value={serverForm.username}
+                      onChange={(event) => updateServerForm('username', event.target.value)}
+                    />
+                  </label>
+                  <label>
+                    Password
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      autoComplete="current-password"
+                      value={serverForm.password}
+                      onChange={(event) => updateServerForm('password', event.target.value)}
+                    />
+                  </label>
+                </div>
+                <label className="connect-ssl">
+                  <input type="checkbox" checked readOnly disabled /> TLS is required by the server
+                </label>
+                {serverError && (
+                  <p className="connect-error" role="alert">
+                    {serverError}
+                  </p>
+                )}
+                <button type="submit" className="connect-submit" disabled={connecting}>
+                  {connecting ? 'Checking connection…' : 'Connect source'}{' '}
+                  <ArrowUpRight size={17} />
+                </button>
+              </form>
+            )}
+          </div>
         </div>
         <footer className="connect-stage-footer">
           <span>CSV · XLSX</span>

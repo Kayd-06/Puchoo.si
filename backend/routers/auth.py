@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import case, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
 
 from backend import emailer
 from backend.authorization import capabilities_for, effective_role, tenant_id_for
@@ -435,6 +436,31 @@ def update_workspace_member_role(
         membership.role = body.role
     db.commit()
     return _workspace_member_response(member, tenant_id)
+
+
+class DeleteOrganizationRequest(BaseModel):
+    confirmation: str = Field(min_length=1, max_length=200)
+
+
+@router.delete("/workspace", status_code=204)
+def delete_organization(
+    body: DeleteOrganizationRequest,
+    request: Request,
+    user: User = Depends(current_user),
+) -> Response:
+    enforce_csrf(request)
+    if effective_role(user) != "owner" or user.workspace_type not in {"business", "institution", "institute"}:
+        raise HTTPException(status_code=403, detail="Only the business or school owner can delete it.")
+    name = user.workspace_name or user.institute_name
+    if not name or body.confirmation != name:
+        raise HTTPException(status_code=400, detail="Enter the exact business or school name to confirm deletion.")
+    from apps.api.session import session_manager
+
+    session_manager.remove_organization(user.id)
+    response = Response(status_code=204)
+    clear_session_cookie(response)
+    clear_login_challenge_cookie(response)
+    return response
 
 
 @router.delete("/workspace/members/{member_id}", status_code=204)

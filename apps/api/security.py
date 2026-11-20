@@ -118,3 +118,12 @@ def require_workspace_admin(
     if not can_administer_workspace(user):
         raise HTTPException(status_code=403, detail="Only workspace admins can make this change.")
     return workspace
+
+
+def require_workspace_owner(
+    workspace: dict = Depends(get_workspace_guard),
+    user=Depends(current_user),
+):
+    if effective_role(user) != "owner":
+        raise HTTPException(status_code=403, detail="Only the owner can delete a data source.")
+    return workspace

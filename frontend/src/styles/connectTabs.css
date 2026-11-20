@@ -1,106 +1,550 @@
-/* Reserve a separate row for the outline so headings and tabs never mask it. */
-#root .app-container .connect-page .connect-stage-content {
-  align-content: start;
-  padding-top: clamp(20px, 4vh, 48px);
+/* Scoped geometry keeps the source workflow independent of legacy page styles. */
+#root .app-container .connect-page {
+  --source-bg: #111210;
+  --source-panel: #191b18;
+  --source-input: #121410;
+  --source-line: #383c33;
+  --source-text: #f0f1e9;
+  --source-muted: #a4ab9c;
+  --source-accent: #d8e7bd;
+  --source-on-accent: #243019;
+  min-height: 0;
+  background: var(--source-bg);
+  color: var(--source-text);
 }
-#root .app-container .connect-page .connect-word {
-  position: relative;
-  inset: auto;
-  display: block;
-  justify-self: center;
-  width: min(100%, 740px);
-  height: auto;
-  aspect-ratio: 1200 / 360;
-  margin: 0 auto 18px;
+html[data-theme='light'] #root .app-container .connect-page {
+  --source-bg: #eeede9;
+  --source-panel: #ffffff;
+  --source-input: #eeede9;
+  --source-line: #d4d0c7;
+  --source-text: #22251c;
+  --source-muted: #66695a;
+  --source-accent: #292925;
+  --source-on-accent: #ffffff;
+}
+#root .app-container .connect-page .connect-stage {
+  min-height: 0;
+  padding: clamp(20px, 2.5vw, 36px);
+  background: var(--source-bg);
   overflow: visible;
 }
-#root .app-container .connect-page .connect-word text {
-  font:
-    500 260px Arial,
-    Helvetica,
-    sans-serif;
-  letter-spacing: -0.06em;
+#root .app-container .connect-page .connect-stage::before,
+#root .app-container .connect-page .connect-stage::after {
+  display: none;
 }
-@media (max-width: 520px) {
-  #root .app-container .connect-page .connect-word {
-    margin-bottom: 14px;
-  }
+#root .app-container .connect-page .connect-stage-header,
+#root .app-container .connect-page .connect-stage-footer {
+  color: var(--source-muted);
+  font: 500 10px/1.4 var(--font-sans);
+  letter-spacing: 0.1em;
 }
-
-/* A compact segmented control; geometry is shared by both themes. */
+#root .app-container .connect-page .connect-stage-header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--source-line);
+}
+#root .app-container .connect-page .connect-stage-content {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  align-content: center;
+  gap: clamp(24px, 4vw, 64px);
+  width: min(100%, 1080px);
+  padding: 28px 0;
+  margin: auto;
+  pointer-events: auto;
+}
+#root .app-container .connect-page .connect-intro {
+  align-self: center;
+}
+#root .app-container .connect-page .connect-eyebrow {
+  color: var(--source-accent);
+  font: 600 10px/1.5 var(--font-sans);
+  letter-spacing: 0.12em;
+}
+#root .app-container .connect-page .connect-intro h2 {
+  margin: 16px 0;
+  font: 500 clamp(28px, 3vw, 42px)/1.12 var(--font-sans);
+  letter-spacing: -0.045em;
+  color: var(--source-text);
+}
+#root .app-container .connect-page .connect-intro > p {
+  max-width: 320px;
+  color: var(--source-muted);
+  font: 400 13px/1.7 var(--font-sans);
+  margin-bottom: 28px;
+}
+#root .app-container .connect-page .connect-trust-item {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  color: var(--source-accent);
+}
+#root .app-container .connect-page .connect-trust-item div {
+  display: grid;
+  gap: 5px;
+}
+#root .app-container .connect-page .connect-trust-item strong {
+  color: var(--source-text);
+  font: 500 13px var(--font-sans);
+}
+#root .app-container .connect-page .connect-trust-item span {
+  color: var(--source-muted);
+  font: 400 12px/1.5 var(--font-sans);
+}
+#root .app-container .connect-page .connect-intro-note {
+  margin-top: 30px;
+  border-top: 1px solid var(--source-line);
+  padding-top: 18px;
+  color: var(--source-accent);
+  font: 500 9px/1.5 var(--font-sans);
+  letter-spacing: 0.1em;
+}
+#root .app-container .connect-page .connect-intro-note span {
+  display: block;
+  margin-top: 5px;
+  color: var(--source-muted);
+  font-size: 12px;
+  letter-spacing: 0;
+}
+#root .app-container .connect-page .connect-workbench {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--source-line);
+  border-radius: 18px;
+  background: var(--source-panel);
+  box-shadow: 0 12px 40px #0000000a;
+}
 #root .app-container .connect-page .connect-tablist {
-  --tab-track: #0b0b0b;
-  --tab-border: #353535;
-  --tab-text: #a9a9a9;
-  --tab-selected: #292929;
-  --tab-selected-text: #f0f0f0;
-  --tab-hover: #191919;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(100%, 370px);
+  width: 100%;
   gap: 4px;
+  margin: 0 0 22px;
   padding: 4px;
-  border: 1px solid var(--tab-border);
-  border-radius: 13px;
-  background: var(--tab-track);
-  box-shadow: none;
-}
-html[data-theme='light'] #root .app-container .connect-page .connect-tablist {
-  --tab-track: #e0e5eb;
-  --tab-border: #c7cfd9;
-  --tab-text: #566270;
-  --tab-selected: #f2f4f6;
-  --tab-selected-text: #304f73;
-  --tab-hover: #e9edf2;
+  border: 1px solid var(--source-line);
+  border-radius: 10px;
+  background: var(--source-input);
 }
 #root .app-container .connect-page .connect-tablist button {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  min-height: 36px;
   min-width: 0;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 9px;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
   background: transparent;
-  color: var(--tab-text);
-  font: 500 13px/1.35 var(--font-sans);
-  white-space: normal;
   box-shadow: none;
-  transition:
-    background-color 160ms ease,
-    color 160ms ease,
-    box-shadow 160ms ease;
-}
-#root .app-container .connect-page .connect-tablist button svg {
-  flex-shrink: 0;
-  width: 17px;
-  height: 17px;
-}
-#root .app-container .connect-page .connect-tablist button:hover:not(.is-active) {
-  background: var(--tab-hover);
-  color: var(--tab-selected-text);
+  color: var(--source-muted);
+  font: 500 12px/1.4 var(--font-sans);
+  white-space: normal;
 }
 #root .app-container .connect-page .connect-tablist button.is-active {
-  background: var(--tab-selected);
-  border-color: var(--tab-border);
-  color: var(--tab-selected-text);
-  box-shadow: 0 1px 3px #00000012;
+  background: var(--source-panel);
+  color: var(--source-text);
+  box-shadow: 0 1px 4px #00000018;
 }
-#root .app-container .connect-page .connect-tablist button:focus-visible {
-  outline: 2px solid var(--control-focus);
-  outline-offset: -3px;
+#root .app-container .connect-page .connect-tablist button:hover {
+  color: var(--source-accent);
 }
-@media (max-width: 360px) {
-  #root .app-container .connect-page .connect-tablist button {
-    gap: 6px;
-    padding-inline: 6px;
-    font-size: 12px;
+#root
+  .app-container
+  .connect-page
+  :is(.connect-upload-flow, .connect-server-form, .connect-complete) {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  text-align: left;
+}
+#root
+  .app-container
+  .connect-page
+  :is(.connect-upload-flow, .connect-server-form, .connect-complete)
+  h1 {
+  color: var(--source-text);
+  font: 500 24px/1.2 var(--font-sans);
+  letter-spacing: -0.035em;
+  margin: 0;
+}
+#root
+  .app-container
+  .connect-page
+  :is(.connect-upload-flow, .connect-server-form, .connect-complete)
+  > p {
+  max-width: none;
+  margin: 8px 0 0;
+  color: var(--source-muted);
+  font: 400 12px/1.6 var(--font-sans);
+}
+#root .app-container .connect-page .connect-dropzone {
+  min-height: 160px;
+  margin-top: 20px;
+  padding: 16px;
+  border: 1px dashed var(--source-line);
+  border-radius: 12px;
+  background: var(--source-input);
+  color: var(--source-text);
+  box-shadow: none;
+  transform: none;
+}
+#root .app-container .connect-page .connect-dropzone::before {
+  display: none;
+}
+#root .app-container .connect-page .connect-dropzone:is(:hover, .is-dragging, .is-uploading) {
+  border-color: var(--source-accent);
+}
+#root .app-container .connect-page .connect-dropzone-mark {
+  border-color: var(--source-line);
+  color: var(--source-accent);
+  border-radius: 12px;
+}
+#root .app-container .connect-page .connect-dropzone > span {
+  color: var(--source-muted);
+}
+#root .app-container .connect-page .connect-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+#root .app-container .connect-page .connect-file-input:focus-visible + .connect-dropzone {
+  outline: 2px solid var(--source-accent);
+  outline-offset: 4px;
+}
+#root .app-container .connect-page .connect-server-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+#root .app-container .connect-page .connect-server-grid > label {
+  display: grid;
+  gap: 6px;
+  grid-column: auto;
+  color: var(--source-muted);
+  font: 500 11px/1.3 var(--font-sans);
+}
+#root .app-container .connect-page .connect-server-grid > label:last-child {
+  grid-column: 1 / -1;
+}
+#root
+  .app-container
+  .connect-page
+  :is(.connect-server-grid input, .connect-server-grid select, .connect-selected-files input) {
+  grid-column: auto;
+  min-width: 0;
+  height: 38px;
+  padding: 9px 11px;
+  border: 1px solid var(--source-line);
+  border-radius: 7px;
+  background: var(--source-input);
+  color: var(--source-text);
+  font: 400 12px var(--font-sans);
+}
+#root .app-container .connect-page input::placeholder {
+  color: var(--source-muted);
+  opacity: 0.8;
+}
+#root .app-container .connect-page .connect-server-grid select option {
+  background: var(--source-panel);
+  color: var(--source-text);
+}
+#root .app-container .connect-page :is(input, select, button, a):focus-visible {
+  outline: 2px solid var(--source-accent);
+  outline-offset: 3px;
+}
+#root .app-container .connect-page .connect-ssl {
+  justify-content: flex-start;
+  margin-top: 14px;
+  color: var(--source-muted);
+  font-size: 11px;
+}
+#root .app-container .connect-page .connect-submit {
+  width: 100%;
+  min-height: 40px;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 14px;
+  background: var(--source-accent);
+  color: var(--source-on-accent);
+  font: 600 12px/1.4 var(--font-sans);
+  transform: none;
+}
+#root .app-container .connect-page .connect-selected-files > div {
+  max-height: 96px;
+  overflow-y: auto;
+  padding: 2px;
+  gap: 6px;
+}
+#root .app-container .connect-page .connect-selected-files > div > span {
+  border-color: var(--source-line);
+  color: var(--source-text);
+}
+#root .app-container .connect-page .connect-selected-files > div :is(button, svg) {
+  color: var(--source-accent);
+}
+#root .app-container .connect-page p.connect-error {
+  color: #e38181;
+}
+html[data-theme='light'] #root .app-container .connect-page p.connect-error {
+  color: #af3030;
+}
+#root .app-container .connect-page .connect-stage-footer {
+  padding-top: 4px;
+}
+#root .app-container .connect-page .connect-complete > div {
+  margin: 8px 0 16px;
+  color: var(--source-accent);
+}
+#root .app-container .connect-page .connect-complete > button {
+  display: block;
+  margin-top: 16px;
+  color: var(--source-muted);
+}
+@media (min-width: 1100px) and (min-height: 780px) {
+  #root .app-container .connect-page .connect-stage {
+    min-height: calc(100svh - 140px);
+  }
+}
+@media (max-width: 1100px), (max-height: 740px) {
+  #root .app-container .connect-page .connect-stage-content {
+    gap: 24px;
+    padding-block: 20px;
+  }
+  #root .app-container .connect-page .connect-intro h2 {
+    font-size: 28px;
+  }
+  #root .app-container .connect-page .connect-workbench {
+    padding: 18px;
+  }
+  #root .app-container .connect-page .connect-tablist {
+    margin-bottom: 16px;
+  }
+}
+@media (max-width: 760px) {
+  #root .app-container .connect-page .connect-stage {
+    padding: 20px 16px;
+  }
+  #root .app-container .connect-page .connect-stage-content {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+  #root .app-container .connect-page .connect-intro h2 {
+    margin: 10px 0;
+  }
+  #root .app-container .connect-page .connect-intro h2 br {
+    display: none;
+  }
+  #root .app-container .connect-page .connect-intro > p {
+    max-width: none;
+    margin: 0;
+  }
+  #root .app-container .connect-page :is(.connect-trust-item, .connect-intro-note) {
+    display: none;
+  }
+  #root .app-container .connect-page .connect-stage-header {
+    gap: 12px;
+    font-size: 9px;
+  }
+}
+@media (max-width: 420px) {
+  #root .app-container .connect-page .connect-server-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  #root .app-container .connect-page .connect-stage-footer {
+    flex-wrap: wrap;
+  }
+}
+
+#root .app-container .connect-page .connect-stage-footer span {
+  opacity: 1;
+  animation: none;
+  color: var(--source-muted);
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  #root .app-container .connect-page .connect-stage {
+    padding: 18px 28px;
+  }
+  #root .app-container .connect-page .connect-stage-header {
+    padding-bottom: 12px;
+  }
+  #root .app-container .connect-page .connect-stage-content {
+    padding-block: 16px;
+  }
+  #root .app-container .connect-page .connect-workbench {
+    padding: 16px;
+  }
+  #root .app-container .connect-page .connect-tablist {
+    margin-bottom: 14px;
+  }
+  #root .app-container .connect-page .connect-server-grid {
+    gap: 8px 12px;
+    margin-top: 14px;
+  }
+  #root .app-container .connect-page .connect-server-grid > label {
+    gap: 4px;
+  }
+  #root .app-container .connect-page .connect-server-grid :is(input, select) {
+    height: 34px;
+    padding-block: 7px;
+  }
+  #root .app-container .connect-page .connect-ssl {
+    margin-top: 10px;
+  }
+  #root .app-container .connect-page .connect-submit {
+    margin-top: 12px;
+  }
+}
+
+@media (min-width: 761px) and (max-height: 800px) {
+  #root
+    .app-container
+    .connect-page
+    .connect-upload-flow:has(.connect-selected-files)
+    .connect-dropzone {
+    min-height: 100px;
+    gap: 5px;
+    padding: 10px;
+  }
+  #root .app-container .connect-page .connect-selected-files > div {
+    max-height: 64px;
+  }
+}
+
+/* The word moves through light, while its reserved space and the form stay still. */
+#root .app-container .connect-page .connect-signal {
+  display: flex;
+  align-items: center;
+  height: 92px;
+  width: 100%;
+  max-width: 410px;
+  margin: 12px 0 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+#root .app-container .connect-page .connect-signal-word {
+  display: block;
+  font:
+    650 clamp(66px, 6.6vw, 94px)/1.05 Arial,
+    Helvetica,
+    sans-serif;
+  letter-spacing: -0.065em;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in srgb, var(--source-accent) 40%, transparent);
+  background: linear-gradient(
+    105deg,
+    transparent 32%,
+    color-mix(in srgb, var(--source-accent) 15%, transparent) 43%,
+    color-mix(in srgb, var(--source-accent) 80%, transparent) 50%,
+    color-mix(in srgb, var(--source-accent) 15%, transparent) 57%,
+    transparent 68%
+  );
+  background-size: 260% 100%;
+  background-position: 150% 0;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation:
+    connect-word-arrive 0.35s ease-out both,
+    connect-word-light 5s ease-in-out infinite;
+}
+#root .app-container .connect-page .connect-signal[data-state='SYNC'] .connect-signal-word {
+  animation-duration: 0.35s, 2.2s;
+}
+@keyframes connect-word-arrive {
+  from {
+    opacity: 0.25;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes connect-word-light {
+  0%,
+  10% {
+    background-position: 150% 0;
+  }
+  75%,
+  100% {
+    background-position: -100% 0;
+  }
+}
+/* Hover changes color only; shared button/card lift rules must not move this workflow. */
+#root
+  .app-container
+  .connect-page
+  :is(
+    .connect-stage,
+    .connect-intro,
+    .connect-workbench,
+    .connect-dropzone,
+    .connect-tablist,
+    button,
+    a,
+    input,
+    select
+  ) {
+  transform: none;
+  translate: none;
+  scale: none;
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+}
+#root
+  .app-container
+  .connect-page
+  :is(
+    .connect-stage,
+    .connect-intro,
+    .connect-workbench,
+    .connect-dropzone,
+    .connect-tablist,
+    button,
+    a,
+    input,
+    select
+  ):is(:hover, :active, :focus-within),
+#root .app-container .connect-page :is(button, a, label):hover svg {
+  transform: none;
+  translate: none;
+  scale: none;
+}
+#root .app-container .connect-page .connect-workbench:hover {
+  border-color: color-mix(in srgb, var(--source-line) 80%, var(--source-accent));
+}
+@media (min-width: 761px) and (max-height: 800px) {
+  #root .app-container .connect-page .connect-signal {
+    height: 72px;
+    margin-top: 8px;
+  }
+  #root .app-container .connect-page .connect-signal-word {
+    font-size: 72px;
+  }
+  #root .app-container .connect-page .connect-intro > p {
+    margin-bottom: 20px;
+  }
+  #root .app-container .connect-page .connect-trust-item {
+    margin-top: 14px;
+  }
+  #root .app-container .connect-page .connect-intro-note {
+    margin-top: 20px;
+  }
+}
+@media (max-width: 760px) {
+  #root .app-container .connect-page .connect-signal {
+    height: 66px;
+    margin-top: 6px;
+  }
+  #root .app-container .connect-page .connect-signal-word {
+    font-size: 64px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  #root .app-container .connect-page .connect-tablist button {
-    transition: none;
+  #root .app-container .connect-page .connect-signal-word {
+    animation: none;
+    background: none;
   }
 }

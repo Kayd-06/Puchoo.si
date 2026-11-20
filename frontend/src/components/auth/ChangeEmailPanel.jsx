@@ -126,6 +126,7 @@ export default function ChangeEmailPanel() {
       <button
         type="button"
         className="settings-action"
+        aria-label="Change email"
         onClick={(event) => {
           openerRef.current = event.currentTarget;
           setOpen(true);

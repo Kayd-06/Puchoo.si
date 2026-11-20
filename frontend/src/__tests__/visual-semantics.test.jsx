@@ -119,22 +119,6 @@ it('keeps workspace-member labels legible on the light Settings surface', () => 
   );
 });
 
-it('keeps the data-source background word outline-only and highlights it only on direct hover', () => {
-  const markup = source('src/pages/ConnectData.jsx');
-  const css = source('src/index.css');
-  expect(markup).toMatch(/<svg\s+className="connect-word"[\s\S]*pointerEvents="stroke"/);
-  expect(css).not.toMatch(/\.connect-stage:has\(\.connect-tablist button:hover\) \.connect-word/s);
-  expect(css).toMatch(/\.connect-word:hover/s);
-  expect(css).toMatch(/\.connect-word text\s*\{[^}]*pointer-events:\s*stroke/s);
-  expect(css).toMatch(/html\[data-theme=["']dark["']\][^{]*\{[^}]*stroke:\s*#fff/s);
-  expect(css).toMatch(/html\[data-theme=["']light["']\][^{]*\{[^}]*stroke:\s*#16130c/s);
-  expect(css).toMatch(/\.connect-word\s*\{[^}]*color:\s*transparent/s);
-  expect(css).toMatch(/\.connect-stage-content\s*\{[^}]*z-index:\s*5[^}]*pointer-events:\s*none/s);
-  expect(css).toMatch(
-    /\.connect-tablist,[\s\S]*?\.connect-submit,[\s\S]*?\{[^}]*pointer-events:\s*auto/s,
-  );
-});
-
 it('shares workspace geometry and typography between themes', () => {
   const css = source('src/styles/lightPalette.css');
   const blocks = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];

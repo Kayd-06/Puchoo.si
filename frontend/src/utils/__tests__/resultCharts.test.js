@@ -151,3 +151,74 @@ it('reports nothing to export when repeated categories have no aggregation', () 
     chartExportData(record, { ...resolveChart(record).initial, aggregation: 'sum' }).data,
   ).toEqual([expect.objectContaining({ label: 'North', value: 3 })]);
 });
+
+it('charts category counts for student lists without treating IDs as measures', () => {
+  const record = {
+    columns: ['student_id', 'full_name', 'class_name', 'section', 'student_status'],
+    rows: [
+      {
+        student_id: 2,
+        full_name: 'A',
+        class_name: 'Grade 9',
+        section: 'C',
+        student_status: 'Active',
+      },
+      {
+        student_id: 11,
+        full_name: 'B',
+        class_name: 'Grade 9',
+        section: 'C',
+        student_status: 'Active',
+      },
+      {
+        student_id: 13,
+        full_name: 'C',
+        class_name: 'Grade 9',
+        section: 'B',
+        student_status: 'Graduated',
+      },
+    ],
+  };
+  expect(defaultChart(record)).toMatchObject({ x: 'section', aggregation: 'count' });
+  const chart = resolveChart(record);
+  expect(chart.drawable).toBe(true);
+  expect(chart.data.map(({ label, value }) => ({ label, value }))).toEqual([
+    { label: 'C', value: 2 },
+    { label: 'B', value: 1 },
+  ]);
+  expect(chart.measures).toEqual([]);
+  expect(resolveChart(record, { ...chart.initial, aggregation: 'sum' }).aggregation).toBe('count');
+  expect(chartExportData(record).data).toEqual(chart.data);
+});
+
+it.each([
+  { columns: ['section'], rows: [{ section: 'A' }, { section: 'A' }, { section: 'B' }] },
+  { columns: ['region', 'sales'], rows: [{ region: 'North', sales: 12 }] },
+  { columns: ['region', 'sales'], rows: [] },
+])('skips charts for one-column, one-row, and empty results: %j', (record) => {
+  expect(defaultChart(record)).toBeNull();
+  expect(resolveChart(record)).toBeNull();
+  expect(chartExportData(record)).toBeNull();
+});
+
+it.each([
+  {
+    columns: ['region', 'sales'],
+    rows: [
+      { region: 'North', sales: 12 },
+      { region: 'South', sales: 8 },
+    ],
+  },
+  {
+    columns: ['section', 'status'],
+    rows: [
+      { section: 'A', status: 'Active' },
+      { section: 'A', status: 'Active' },
+      { section: 'B', status: 'Active' },
+    ],
+  },
+])('keeps suitable small multi-row, multi-column charts visible: %j', (record) => {
+  expect(defaultChart(record)).not.toBeNull();
+  expect(resolveChart(record).drawable).toBe(true);
+  expect(chartExportData(record)).not.toBeNull();
+});

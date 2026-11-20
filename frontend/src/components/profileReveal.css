@@ -1,0 +1,758 @@
+/* The reference's layered reveal becomes an account identity, with native profile actions. */
+#root .app-container .settings-page .settings-section.profile-reveal {
+  --identity-face: #343432;
+  --identity-pocket: #242320;
+  --identity-edge: #62615b;
+  --identity-ink: #f5f3ed;
+  --identity-muted: #c2bfb5;
+  min-height: 0;
+  min-width: 0;
+  align-self: start;
+  padding: 22px;
+  border-radius: 26px;
+  background: var(--profile-bg);
+  overflow: hidden;
+}
+html[data-theme='light'] #root .app-container .settings-page .profile-reveal {
+  --identity-face: #dedbce;
+  --identity-pocket: #f2f0eb;
+  --identity-edge: #bbb7a5;
+  --identity-ink: #26291f;
+  --identity-muted: #565b4a;
+}
+#root .app-container .settings-page .profile-reveal .settings-card-label {
+  margin: 0;
+  padding-bottom: 16px;
+}
+#root .app-container .settings-page .profile-reveal-window {
+  position: relative;
+  isolation: isolate;
+  height: 300px;
+  margin: 20px 0 18px;
+  border-radius: 25px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, var(--identity-edge) 35%, var(--profile-bg)),
+    var(--profile-bg)
+  );
+  border: 1px solid var(--profile-line);
+  box-shadow:
+    inset 0 1px 0 #ffffff0c,
+    0 10px 25px #0000000b;
+  transition: height 0.65s cubic-bezier(0.22, 0.8, 0.25, 1);
+}
+#root .app-container .settings-page .profile-identity-sheet {
+  position: absolute;
+  inset: 20px 12px auto;
+  height: 238px;
+  padding: 18px;
+  border: 1px solid var(--identity-edge);
+  border-radius: 20px;
+  color: var(--identity-ink);
+  background:
+    repeating-linear-gradient(0deg, #ffffff03 0 1px, transparent 1px 3px),
+    linear-gradient(
+      125deg,
+      color-mix(in srgb, var(--identity-face) 65%, #000),
+      var(--identity-face) 72%,
+      color-mix(in srgb, var(--identity-face) 80%, #fff)
+    );
+  box-shadow:
+    inset 0 1px 0 #ffffff30,
+    0 8px 20px #00000025;
+  overflow: hidden;
+  transform: translateY(0);
+  transition:
+    transform 0.65s cubic-bezier(0.22, 0.8, 0.25, 1),
+    box-shadow 0.65s ease;
+}
+html[data-theme='light'] #root .app-container .settings-page .profile-identity-sheet {
+  background:
+    repeating-linear-gradient(0deg, #ffffff18 0 1px, transparent 1px 3px),
+    linear-gradient(125deg, #f6f3e9, var(--identity-face) 72%, #faf8ef);
+  box-shadow:
+    inset 0 1px 0 #ffffff,
+    0 8px 20px #465b711a;
+}
+#root .app-container .settings-page .profile-sheet-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--identity-ink);
+  font: 600 15px/1 var(--font-sans);
+  letter-spacing: -0.04em;
+}
+#root .app-container .settings-page .profile-sheet-brand svg {
+  opacity: 0.55;
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-topline {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 25px 0 0;
+  margin: 0;
+}
+#root .app-container .settings-page .profile-reveal .settings-avatar {
+  grid-row: 1 / 3;
+  width: 56px;
+  height: 56px;
+  min-width: 56px;
+  border-radius: 17px;
+  border: 1px solid var(--identity-edge);
+  background: color-mix(in srgb, var(--identity-face) 60%, var(--profile-bg));
+  color: var(--identity-ink);
+}
+#root .app-container .settings-page .profile-reveal .settings-avatar-edit {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--identity-face);
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-identity {
+  min-width: 0;
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-identity h2 {
+  color: var(--identity-ink);
+  font-size: clamp(19px, 2vw, 25px);
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-titleline {
+  display: block;
+}
+#root .app-container .settings-page .profile-reveal .settings-workspace-badge {
+  display: inline-block;
+  margin-top: 7px;
+  padding: 3px 7px;
+  border: 1px solid var(--identity-edge);
+  background: #ffffff08;
+  color: var(--identity-muted);
+  font-size: 10px;
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-identity p {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--identity-muted);
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-identity p > span {
+  color: var(--identity-muted);
+}
+#root .app-container .settings-page .profile-reveal .account-profile-email {
+  display: none;
+}
+#root .app-container .settings-page .profile-reveal .settings-verified {
+  grid-column: 2;
+  margin: 0;
+  padding: 0;
+  background: none;
+  color: var(--identity-muted);
+  font-size: 10px;
+}
+#root .app-container .settings-page .profile-sleeve {
+  position: absolute;
+  z-index: 2;
+  inset: auto 0 0;
+  height: 100px;
+  overflow: hidden;
+  border-radius: 0 0 24px 24px;
+  filter: drop-shadow(0 -2px 3px #00000020);
+  transform: translateY(0);
+  transition:
+    transform 0.65s cubic-bezier(0.22, 0.8, 0.25, 1),
+    opacity 0.5s ease;
+}
+#root .app-container .settings-page .profile-sleeve svg {
+  width: 100%;
+  height: 100%;
+  fill: var(--identity-pocket);
+}
+#root .app-container .settings-page .profile-sleeve::after {
+  content: '';
+  position: absolute;
+  inset: 30px 8px 8px;
+  border: 1px dashed color-mix(in srgb, var(--identity-edge) 40%, transparent);
+  border-top: 0;
+  border-radius: 0 0 17px 17px;
+}
+#root .app-container .settings-page .profile-reveal-trigger {
+  position: absolute;
+  z-index: 4;
+  inset: auto 13px 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: calc(100% - 26px);
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--identity-ink);
+  font: 500 12px/1.4 var(--font-sans);
+  cursor: pointer;
+}
+#root .app-container .settings-page .profile-reveal-trigger span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#root .app-container .settings-page .profile-reveal-trigger > svg {
+  transition: transform 0.5s ease;
+}
+#root .app-container .settings-page .profile-reveal-trigger:hover {
+  background: #ffffff08;
+}
+#root .app-container .settings-page .profile-reveal-trigger:focus-visible {
+  outline: 2px solid var(--profile-accent);
+  outline-offset: -2px;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-reveal-window {
+  height: 280px;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-identity-sheet {
+  transform: translateY(-9px);
+  box-shadow:
+    inset 0 1px 0 #ffffff30,
+    0 12px 28px #00000020;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-sleeve {
+  transform: translateY(32px);
+  opacity: 0;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-reveal-trigger {
+  background: var(--identity-pocket);
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-reveal-trigger > svg {
+  transform: rotate(180deg);
+}
+#root .app-container .settings-page .profile-details-reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.65s cubic-bezier(0.22, 0.8, 0.25, 1),
+    opacity 0.4s ease;
+}
+#root .app-container .settings-page .profile-details-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-details-reveal {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+#root .app-container .settings-page .profile-reveal .settings-photo-row {
+  margin: 0;
+  padding: 14px;
+  border-radius: 15px;
+  background: var(--profile-card);
+}
+#root .app-container .settings-page .profile-reveal .settings-photo-row strong {
+  font-size: 12px;
+}
+#root .app-container .settings-page .profile-reveal .settings-photo-row span {
+  font-size: 10px;
+}
+#root .app-container .settings-page .profile-reveal .settings-profile-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding-top: 22px;
+}
+#root .app-container .settings-page .profile-reveal .settings-section-footer {
+  flex-wrap: wrap;
+}
+@media (max-width: 600px) {
+  #root .app-container .settings-page .settings-section.profile-reveal {
+    padding: 16px;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-photo-row {
+    flex-direction: row;
+    align-items: center;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-photo-entry-actions {
+    flex-shrink: 0;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-photo-row > div:first-child {
+    min-width: 0;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-profile-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 380px) {
+  #root .app-container .settings-page .profile-identity-sheet {
+    padding: 14px;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-profile-topline {
+    grid-template-columns: 44px minmax(0, 1fr);
+    gap: 10px;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-avatar {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+  }
+  #root .app-container .settings-page .profile-reveal .settings-photo-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-container .settings-page .profile-reveal,
+  #root .app-container .settings-page .profile-reveal *,
+  #root .app-container .settings-page .profile-reveal *::after {
+    transition: none;
+    animation: none;
+  }
+}
+
+#root .app-container .settings-page .settings-section.profile-reveal {
+  width: 100%;
+  max-width: 620px;
+  justify-self: center;
+}
+#root .app-container .settings-page .profile-identity-sheet::after {
+  content: '';
+  position: absolute;
+  inset: -50% -80%;
+  background: linear-gradient(
+    115deg,
+    transparent 40%,
+    #ffffff0e 48%,
+    #ffffff24 50%,
+    #ffffff0e 52%,
+    transparent 60%
+  );
+  transform: translateX(-45%);
+  pointer-events: none;
+  opacity: 0;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-identity-sheet::after {
+  animation: profile-material-reveal 950ms cubic-bezier(0.22, 0.8, 0.25, 1) both;
+}
+@keyframes profile-material-reveal {
+  0% {
+    transform: translateX(-45%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(45%);
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-container .settings-page .profile-reveal.is-open .profile-identity-sheet::after {
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #root .app-container .settings-page .profile-reveal .profile-reveal-trigger > svg {
+    transition: none;
+  }
+}
+
+/* The expanded state follows the reference: lift the identity, then reveal inset controls. */
+#root .app-container .settings-page .profile-reveal-window {
+  height: 270px;
+  overflow: hidden;
+  perspective: 900px;
+}
+#root .app-container .settings-page .profile-identity-sheet {
+  height: 250px;
+  transform: translateY(20px) rotateX(3deg);
+  transform-origin: 50% 100%;
+  transition:
+    transform 0.72s cubic-bezier(0.19, 1, 0.22, 1),
+    box-shadow 0.72s ease;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-reveal-window {
+  height: 282px;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-identity-sheet {
+  transform: translateY(-9px) rotateX(0);
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-sleeve {
+  transform: translateY(100px);
+  opacity: 0;
+}
+#root .app-container .settings-page .profile-reveal-trigger[hidden] {
+  display: none;
+}
+#root .app-container .settings-page .profile-sheet-data {
+  position: absolute;
+  inset: auto 18px 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;
+}
+#root .app-container .settings-page .profile-sheet-data > div {
+  min-width: 0;
+  display: grid;
+  gap: 6px;
+}
+#root .app-container .settings-page .profile-sheet-data span {
+  color: var(--identity-muted);
+  font: 400 9px/1.2 var(--font-sans);
+}
+#root .app-container .settings-page .profile-sheet-data strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--identity-ink);
+  font: 500 11px/1.4 var(--font-sans);
+  animation: profile-data-reveal 0.28s ease-out;
+}
+#root .app-container .settings-page .profile-sheet-data strong.is-masked {
+  color: var(--identity-muted);
+  letter-spacing: 0.08em;
+  filter: blur(0.7px);
+}
+#root .app-container .settings-page .profile-visibility-controls {
+  display: grid;
+  gap: 9px;
+  padding-top: 16px;
+}
+#root .app-container .settings-page .profile-visibility-row {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 13px;
+  background: var(--identity-pocket);
+  color: var(--profile-text);
+  border: 1px solid color-mix(in srgb, var(--profile-line) 65%, transparent);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 #ffffff05;
+  font: 500 12px/1.4 var(--font-sans);
+  text-align: left;
+  cursor: pointer;
+}
+#root .app-container .settings-page .profile-visibility-row:hover {
+  background: var(--profile-tint);
+  transform: none;
+}
+#root .app-container .settings-page .profile-visibility-state {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--profile-muted);
+}
+#root .app-container .settings-page .profile-visibility-track {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 22px;
+  padding: 3px;
+  border-radius: 14px;
+  background: #61615e;
+  transition: background 0.22s ease;
+}
+#root .app-container .settings-page .profile-visibility-track > span {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #0004;
+  transform: translateX(0);
+  transition: transform 0.28s cubic-bezier(0.22, 0.8, 0.25, 1);
+}
+#root
+  .app-container
+  .settings-page
+  .profile-visibility-row[aria-checked='true']
+  .profile-visibility-track {
+  background: #51c981;
+}
+#root
+  .app-container
+  .settings-page
+  .profile-visibility-row[aria-checked='true']
+  .profile-visibility-track
+  > span {
+  transform: translateX(12px);
+}
+#root .app-container .settings-page .profile-visibility-note {
+  margin: 12px 1px 0;
+  color: var(--profile-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+#root .app-container .settings-page .profile-close-details {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: 20px auto 0;
+  padding: 0;
+  border: 1px solid var(--profile-line);
+  border-radius: 50%;
+  background: var(--profile-bg);
+  color: var(--profile-text);
+  cursor: pointer;
+  box-shadow: inset 0 1px 0 #ffffff0a;
+}
+#root .app-container .settings-page .profile-close-details:hover {
+  background: var(--profile-tint);
+  transform: none;
+}
+@keyframes profile-data-reveal {
+  from {
+    opacity: 0.35;
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@media (max-width: 380px) {
+  #root .app-container .settings-page .profile-visibility-row {
+    gap: 7px;
+    padding-inline: 10px;
+    font-size: 11px;
+  }
+  #root .app-container .settings-page .profile-visibility-state {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .app-container .settings-page .profile-reveal .profile-identity-sheet,
+  #root .app-container .settings-page .profile-reveal .profile-visibility-track,
+  #root .app-container .settings-page .profile-reveal .profile-visibility-track > span,
+  #root .app-container .settings-page .profile-reveal .profile-sheet-data strong {
+    transition: none;
+    animation: none;
+  }
+}
+
+#root .app-container .settings-page .profile-details-inner > .settings-photo-row {
+  margin-top: 16px;
+}
+
+/* Keep the open panel as concise as the reference: identity data lives on the sheet. */
+#root .app-container .settings-page .profile-reveal .profile-account-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 0;
+  border: 0;
+}
+#root .app-container .settings-page .profile-account-actions > .settings-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid color-mix(in srgb, var(--profile-line) 65%, transparent);
+  border-radius: 14px;
+  background: var(--identity-pocket);
+  font-size: 12px;
+}
+#root .app-container .settings-page .profile-account-actions > .settings-action::after {
+  content: '›';
+  font-size: 20px;
+  line-height: 1;
+  color: var(--profile-muted);
+}
+#root .app-container .settings-page .profile-account-timezone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  padding: 0 3px;
+  font-size: 10px;
+  color: var(--profile-muted);
+}
+#root .app-container .settings-page .profile-sheet-data strong:not(.is-masked) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  max-height: 2.8em;
+}
+#root
+  .app-container
+  .settings-page
+  .profile-details-inner
+  > .settings-photo-row
+  > div:first-child
+  > span {
+  display: none;
+}
+#root .app-container .settings-page .profile-details-inner > .settings-photo-row {
+  padding: 10px 13px;
+  min-height: 48px;
+  background: var(--identity-pocket);
+}
+
+#root .app-container .settings-page .profile-visibility-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+#root .app-container .settings-page .profile-visible-value {
+  font: 400 10px/1.5 var(--font-sans);
+  color: var(--profile-muted);
+  overflow-wrap: anywhere;
+  white-space: normal;
+  user-select: text;
+}
+#root .app-container .settings-page .profile-account-actions > .settings-action {
+  min-width: 100%;
+  max-width: 100%;
+}
+
+#root .app-container .settings-page .profile-reveal .profile-account-actions {
+  width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+}
+#root .app-container .settings-page .profile-reveal .profile-account-timezone {
+  width: 100%;
+}
+
+/* One physical card: the arrow turns the identity over inside its sleeve. */
+#root .app-container .settings-page .profile-reveal-window,
+#root .app-container .settings-page .profile-reveal.is-open .profile-reveal-window {
+  height: 282px;
+}
+#root .app-container .settings-page .profile-identity-sheet {
+  transform-style: preserve-3d;
+  transform-origin: center;
+  transform: translateY(0) rotateY(0deg);
+  overflow: visible;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+#root .app-container .settings-page .profile-reveal.is-open .profile-identity-sheet {
+  transform: translateY(-9px) rotateY(180deg);
+  box-shadow: none;
+}
+#root .app-container .settings-page .profile-card-face {
+  position: absolute;
+  inset: 0;
+  padding: 18px;
+  border: 1px solid var(--identity-edge);
+  border-radius: 20px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  overflow: hidden;
+  background: linear-gradient(
+    125deg,
+    color-mix(in srgb, var(--identity-face) 65%, #000),
+    var(--identity-face) 72%,
+    color-mix(in srgb, var(--identity-face) 80%, #fff)
+  );
+  box-shadow:
+    inset 0 1px 0 #ffffff30,
+    0 8px 20px #00000025;
+}
+html[data-theme='light'] #root .app-container .settings-page .profile-card-face {
+  background: linear-gradient(125deg, #faf9f6, var(--identity-face) 72%, #f6f3ed);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    0 8px 20px #2929251a;
+}
+html[data-theme='light'] #root .app-container .settings-page .profile-identity-sheet {
+  background: transparent;
+  box-shadow: none;
+}
+#root .app-container .settings-page .profile-card-back {
+  transform: rotateY(180deg);
+}
+#root .app-container .settings-page .profile-back-name {
+  margin: 28px 0 0;
+  color: var(--identity-ink);
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+#root .app-container .settings-page .profile-card-face[aria-hidden='true'] {
+  pointer-events: none;
+}
+
+/* Keep the reverse action beside the details heading, within the active card face. */
+#root .app-container .settings-page .profile-card-back .profile-close-details {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  margin: -6px -6px -6px 12px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--identity-ink);
+  border-color: var(--identity-edge);
+}
+#root .app-container .settings-page .profile-card-back .profile-close-details:focus-visible {
+  outline: 2px solid var(--profile-accent);
+  outline-offset: 2px;
+}
+
+/* A fitted wallet sleeve, rather than a loose panel around the identity card. */
+#root .app-container .settings-page .profile-reveal-window {
+  border: 1px solid var(--identity-edge);
+  border-radius: 26px;
+  background:
+    repeating-linear-gradient(95deg, #ffffff03 0 1px, transparent 1px 4px),
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--identity-pocket) 88%, #fff),
+      var(--identity-pocket)
+    );
+  box-shadow:
+    inset 0 1px 0 #ffffff38,
+    inset 0 0 0 4px color-mix(in srgb, var(--identity-edge) 12%, transparent),
+    0 8px 22px #00000010;
+}
+#root .app-container .settings-page .profile-reveal-window::before {
+  content: '';
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed color-mix(in srgb, var(--identity-edge) 60%, transparent);
+  border-radius: 19px;
+  pointer-events: none;
+}
+#root .app-container .settings-page .profile-identity-sheet {
+  inset-inline: 16px;
+}
+#root .app-container .settings-page .profile-sleeve {
+  height: 110px;
+  border-radius: 0 0 25px 25px;
+  filter: drop-shadow(0 -2px 2px #00000018);
+}
+#root .app-container .settings-page .profile-sleeve svg {
+  stroke: color-mix(in srgb, var(--identity-edge) 65%, transparent);
+  stroke-width: 0.7px;
+}
+#root .app-container .settings-page .profile-sleeve::after {
+  inset: 28px 9px 9px;
+  border-color: color-mix(in srgb, var(--identity-edge) 65%, transparent);
+  border-radius: 0 0 18px 18px;
+}
+#root .app-container .settings-page .profile-reveal-trigger {
+  inset: auto 15px 15px;
+  width: calc(100% - 30px);
+  min-height: 48px;
+  padding-inline: 14px;
+}
+#root .app-container .settings-page .profile-reveal-trigger:hover {
+  background: color-mix(in srgb, var(--identity-edge) 9%, transparent);
+  transform: none;
+}
+html[data-theme='light'] #root .app-container .settings-page .profile-reveal-window {
+  background: linear-gradient(145deg, #e8e4da, #f0ede5);
+  box-shadow:
+    inset 0 1px 0 #fff,
+    inset 0 0 0 4px #ffffff35,
+    0 8px 22px #2929250d;
+}

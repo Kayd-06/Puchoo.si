@@ -1,113 +1,189 @@
-/* The switch overrides shared square icon-button sizing. */
-#root .app-container button.theme-toggle.theme-switch,
-#root button.theme-toggle.theme-switch {
+/* A recessed track, frosted glass thumb, and an illuminated edge, scaled for app chrome. */
+#root button.theme-toggle.theme-switch,
+#root .app-container button.theme-toggle.theme-switch {
+  --switch-width: 72px;
+  --switch-height: 38px;
+  --switch-thumb: 34px;
+  --switch-travel: 34px;
   position: relative;
+  isolation: isolate;
   display: inline-flex;
   flex: 0 0 auto;
-  align-items: center;
-  width: 56px;
-  min-width: 56px;
-  height: 28px;
-  min-height: 28px;
+  width: var(--switch-width);
+  min-width: var(--switch-width);
+  max-width: none;
+  height: var(--switch-height);
+  min-height: var(--switch-height);
   padding: 0;
   overflow: visible;
-  border: 1px solid #e6e9ee;
-  border-radius: 999px;
-  background: #d2d7e0;
+  border: 1px solid #ffffff0a;
+  border-radius: 20px;
+  background: #050608;
   box-shadow:
-    inset 2px 3px 6px #9aa3b2,
-    inset -2px -2px 4px #ffffff;
+    inset 2px 3px 5px #000c,
+    inset -1px -1px 2px #ffffff12,
+    0 1px 1px #ffffff0a;
+  color: #f7f6ed;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transform: none;
   transition:
-    background 0.25s ease,
-    box-shadow 0.25s ease;
+    background 0.65s ease,
+    border-color 0.65s ease,
+    box-shadow 0.65s ease;
 }
-#root .app-container button.theme-toggle.theme-switch.is-dark,
-#root button.theme-toggle.theme-switch.is-dark {
-  border-color: #454545;
-  background: #171717;
+#root button.theme-toggle.theme-switch.is-light,
+#root .app-container button.theme-toggle.theme-switch.is-light {
+  border-color: #f7f5ee;
+  background: #e8e6e0;
   box-shadow:
-    inset 2px 3px 7px #000000,
-    inset -1px -1px 3px #373737;
+    inset 2px 3px 6px #b6b3a85c,
+    inset -2px -2px 4px #fff,
+    3px 5px 10px #39332120;
+  color: #4b493e;
 }
 #root .theme-switch .theme-switch-track {
   position: absolute;
   inset: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 6px;
-  color: #667080;
+  border-radius: inherit;
+  background: radial-gradient(ellipse at 25% 90%, #34436b30, transparent 65%);
+  pointer-events: none;
 }
-#root .theme-switch.is-dark .theme-switch-track {
-  color: #a3a3a3;
+#root .theme-switch.is-light .theme-switch-track {
+  background: radial-gradient(ellipse at 80% 5%, #ffc44b1a, transparent 70%);
 }
 #root .theme-switch .theme-switch-thumb {
   position: absolute;
-  left: 0;
-  top: -1px;
+  top: 1px;
+  left: 1px;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: linear-gradient(145deg, #ffffff, #e5e9ef);
-  border: 2px solid #f5f7fa;
+  width: var(--switch-thumb);
+  height: var(--switch-thumb);
+  border: 1px solid #cdd8ff42;
+  border-radius: 11px;
+  background: #292b32;
   box-shadow:
-    2px 5px 8px #17263b40,
-    inset 1px 1px 2px #ffffff;
-  color: #815b14;
+    inset 0 1px 1px #ffffff59,
+    inset 1px 0 2px #ffffff24,
+    inset 0 -1px 3px #dae9ff8c,
+    0 3px 6px #0009;
+  color: #faf9f1;
   transform: translateX(0);
   transition:
-    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-    color 0.2s ease;
+    transform 0.56s cubic-bezier(0.65, 0, 0.35, 1),
+    background 0.65s ease,
+    border-color 0.65s ease,
+    box-shadow 0.65s ease,
+    color 0.55s ease;
+  pointer-events: none;
 }
-#root .theme-switch.is-dark .theme-switch-thumb {
-  background: #303030;
-  border-color: #505050;
+#root .theme-switch.is-light .theme-switch-thumb {
+  transform: translateX(var(--switch-travel));
+  border-color: #fff9df;
+  background: #f1efeb;
   box-shadow:
-    0 2px 6px #00000066,
-    inset 0 1px 1px #ffffff20;
-  transform: translateX(26px);
-  color: #eeeeee;
+    inset 0 1px 2px #fffef0,
+    inset 1px 0 2px #fff8,
+    0 3px 6px #5c554136;
+  color: #4b493e;
 }
-#root .theme-switch .theme-switch-thumb svg {
-  stroke-width: 2.2;
-}
-#root .theme-switch .theme-switch-star {
+#root .theme-switch .theme-switch-thumb::before,
+#root .theme-switch .theme-switch-thumb::after {
+  content: '';
   position: absolute;
-  right: 5px;
-  top: 5px;
-  font-size: 6px;
-  line-height: 1;
-  color: #eeeeee;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity 0.68s ease-in-out;
+}
+#root .theme-switch .theme-switch-thumb::before {
+  background:
+    radial-gradient(ellipse at 50% 115%, #b6c4ff 0, #7186f061 23%, transparent 65%),
+    linear-gradient(145deg, #484b52b3, #272931e6 55%, #343c5b);
+  opacity: 1;
+}
+#root .theme-switch .theme-switch-thumb::after {
+  background:
+    radial-gradient(ellipse at 50% -5%, #ffd35fc4 0, #ffdc8c59 30%, transparent 73%),
+    linear-gradient(145deg, #fff7e9eb, #f1efebe6 75%);
+  opacity: 0;
+}
+#root .theme-switch.is-light .theme-switch-thumb::before {
+  opacity: 0;
+}
+#root .theme-switch.is-light .theme-switch-thumb::after {
+  opacity: 1;
+}
+#root .theme-switch .theme-switch-rim {
+  position: absolute;
+  z-index: 3;
+  inset: -1px;
+  width: calc(100% + 2px);
+  height: calc(100% + 2px);
+  overflow: visible;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+#root .theme-switch .theme-switch-rim-edge {
+  stroke: #e6f7ff;
+  stroke-dasharray: 44 56;
+  stroke-dashoffset: -22;
+  filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 3px #9daeff) drop-shadow(0 2px 5px #4767ff);
+  transition:
+    stroke-dashoffset 0.68s cubic-bezier(0.45, 0, 0.35, 1),
+    stroke 0.65s ease,
+    filter 0.65s ease;
+}
+#root .theme-switch.is-light .theme-switch-rim-edge {
+  stroke: #fffbc3;
+  stroke-dashoffset: -72;
+  filter: drop-shadow(0 0 1px #fff9ae) drop-shadow(0 0 3px #ffc02d) drop-shadow(0 -2px 5px #ffa700);
+}
+#root .theme-switch .theme-switch-pixels {
+  position: relative;
+  z-index: 2;
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  filter: drop-shadow(0 0 1px #ffffff38);
+}
+#root .theme-switch.is-light .theme-switch-pixels {
+  filter: none;
+}
+#root button.theme-toggle.theme-switch:hover {
+  transform: none;
 }
 #root button.theme-toggle.theme-switch:hover .theme-switch-thumb {
-  box-shadow:
-    2px 5px 10px #17263b55,
-    inset 1px 1px 2px #ffffff;
+  border-color: #dbe3ff9c;
+}
+#root button.theme-toggle.theme-switch.is-light:hover .theme-switch-thumb {
+  border-color: #fff4b8;
+}
+#root button.theme-toggle.theme-switch:active .theme-switch-pixels {
+  scale: 0.92;
 }
 #root button.theme-toggle.theme-switch:focus-visible {
-  outline: 3px solid #888888;
+  outline: 2px solid #a6b9ff;
   outline-offset: 5px;
 }
-@media (prefers-reduced-motion: reduce) {
-  #root button.theme-toggle.theme-switch,
-  #root .theme-switch .theme-switch-thumb {
-    transition: none;
-  }
+#root button.theme-toggle.theme-switch.is-light:focus-visible {
+  outline-color: #8b661a;
 }
-
+/* Preserve a 44px touch target around the smaller visible control. */
 #root button.theme-toggle.theme-switch::after {
   content: '';
   position: absolute;
-  inset: -8px 0;
+  inset: -4px 0;
   border-radius: inherit;
 }
-
-#root button.theme-toggle.theme-switch.is-dark:hover .theme-switch-thumb {
-  box-shadow:
-    0 2px 8px #00000080,
-    inset 0 1px 1px #ffffff30;
+@media (prefers-reduced-motion: reduce) {
+  #root button.theme-toggle.theme-switch,
+  #root .theme-switch .theme-switch-thumb,
+  #root .theme-switch .theme-switch-thumb::before,
+  #root .theme-switch .theme-switch-thumb::after,
+  #root .theme-switch .theme-switch-rim path {
+    transition: none;
+  }
 }

@@ -92,6 +92,11 @@ export function AuthProvider({ children, loadSession = true }) {
         clearChatSessions();
         setUser(null);
       },
+      async deleteOrganization(confirmation) {
+        await api('/api/v1/auth/workspace', { method: 'DELETE', body: { confirmation } });
+        clearChatSessions();
+        setUser(null);
+      },
     }),
     [user, loadSession, sessionChecked],
   );

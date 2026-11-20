@@ -12,12 +12,12 @@
 }
 html[data-theme='light'] .topbar-menu-anchor {
   --notification-surface: #ffffff;
-  --notification-text: #27313d;
-  --notification-muted: #566270;
-  --notification-line: #d8dfe7;
-  --notification-unread: #edf2f8;
-  --notification-hover: #e4ebf3;
-  --notification-accent: #3f5f86;
+  --notification-text: #20201e;
+  --notification-muted: #66645e;
+  --notification-line: #d0cdbd;
+  --notification-unread: #ece8db;
+  --notification-hover: #e5e0d1;
+  --notification-accent: #292925;
   --notification-danger: #a72c44;
   --notification-danger-bg: #fff0f2;
 }

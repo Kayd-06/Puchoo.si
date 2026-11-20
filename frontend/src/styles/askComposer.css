@@ -53,21 +53,21 @@
 
 /* ask light palette */
 html[data-theme='light'] #root .app-container .ask-page {
-  --ask-stage-bg: #e8ebef;
-  --ask-surface: #f2f4f6;
-  --ask-text: #27313d;
-  --ask-muted: #566270;
-  --ask-border: #a9b4c2;
-  --ask-focus: #3f5f86;
-  --ask-glow: 63, 95, 134;
-  --ask-button-bg: #3f5f86;
+  --ask-stage-bg: #eeede9;
+  --ask-surface: #faf9f6;
+  --ask-text: #20201e;
+  --ask-muted: #66645e;
+  --ask-border: #aaa397;
+  --ask-focus: #292925;
+  --ask-glow: 124, 114, 88;
+  --ask-button-bg: #292925;
   --ask-button-fg: #ffffff;
-  --ask-disabled-bg: #e2e9f0;
-  --ask-disabled-fg: #53667b;
-  --ask-voice-bg: #e5eaf0;
-  --ask-voice-fg: #2e4e6e;
-  --ask-badge-bg: #e0e7ef;
-  --ask-badge-fg: #315573;
+  --ask-disabled-bg: #e3d8c4;
+  --ask-disabled-fg: #66645e;
+  --ask-voice-bg: #eeece7;
+  --ask-voice-fg: #48433b;
+  --ask-badge-bg: #e3d8c4;
+  --ask-badge-fg: #48433b;
 }
 #root .app-container .ask-page .ask-stage {
   background: var(--ask-stage-bg);
@@ -283,11 +283,11 @@ html[data-theme='light'] #root .app-container .ask-page {
     min-height: 112px;
   }
   #root .app-container .ask-page .ask-prompt-controls {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
   }
   #root .app-container .ask-page .ask-prompt-meta {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
   #root .app-container .ask-page .ask-prompt-actions {
     justify-content: flex-end;
@@ -309,41 +309,22 @@ html[data-theme='light'] #root .app-container .ask-page {
   box-shadow: none;
 }
 
-/* The existing request state starts and stops the glow for click and keyboard sends. */
+/* Processing is localized to the bottom status; the composer remains quiet. */
 #root .app-container .ask-page .ask-prompt-shell.is-loading {
-  border-color: var(--ask-focus);
-  animation: ask-composer-glow 1.6s ease-in-out infinite;
+  border-color: var(--ask-border);
+  animation: none;
+  box-shadow: none;
 }
-#root .app-container .ask-page .ask-prompt-shell.is-loading::before {
+#root .app-container .ask-page .ask-prompt-shell.is-loading::before,
+#root .app-container .ask-page .ask-prompt-shell.is-loading::after {
   display: none;
   animation: none;
+  box-shadow: none;
 }
 #root .app-container .ask-page .ask-prompt-shell.is-loading .ask-submit-button {
-  border-color: var(--ask-focus);
-  color: var(--ask-text);
-  box-shadow: 0 0 18px rgba(var(--ask-glow), 0.24);
+  box-shadow: none;
 }
 
-@keyframes ask-composer-glow {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 2px rgba(var(--ask-glow), 0.16),
-      0 0 18px rgba(var(--ask-glow), 0.12);
-  }
-  50% {
-    box-shadow:
-      0 0 0 3px rgba(var(--ask-glow), 0.24),
-      0 0 32px rgba(var(--ask-glow), 0.22);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #root .app-container .ask-page .ask-prompt-shell.is-loading {
-    animation: none;
-    box-shadow: 0 0 0 2px rgba(var(--ask-glow), 0.18);
-  }
-}
 .analysis-selector {
   margin: 20px auto;
   max-width: 1050px;
@@ -387,4 +368,18 @@ html[data-theme='light'] #root .app-container .ask-page {
   -webkit-box-orient: vertical;
   overflow: hidden;
   color: var(--text-secondary, var(--text-muted));
+}
+
+/* Keep the processing replacement beside the existing controls on narrow screens. */
+@media (max-width: 420px) {
+  #root .app-container .ask-page .voice-button span {
+    display: none;
+  }
+  #root .app-container .ask-page .ask-prompt-meta {
+    gap: 5px;
+  }
+  #root .app-container .ask-page .ask-prompt-meta > span:first-child {
+    font-size: 10px;
+    padding-inline: 6px;
+  }
 }

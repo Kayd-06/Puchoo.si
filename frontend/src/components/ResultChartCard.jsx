@@ -255,11 +255,11 @@ export default function ResultChartCard({
           <label>
             Aggregation
             <select value={aggregation} onChange={(e) => update({ aggregation: e.target.value })}>
-              <option value="none">Keep table values</option>
-              <option value="sum">Sum</option>
-              <option value="average">Average</option>
-              <option value="min">Minimum</option>
-              <option value="max">Maximum</option>
+              {measures.length > 0 && <option value="none">Keep table values</option>}
+              {measures.length > 0 && <option value="sum">Sum</option>}
+              {measures.length > 0 && <option value="average">Average</option>}
+              {measures.length > 0 && <option value="min">Minimum</option>}
+              {measures.length > 0 && <option value="max">Maximum</option>}
               <option value="count">Row count</option>
             </select>
           </label>

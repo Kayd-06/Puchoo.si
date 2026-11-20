@@ -96,6 +96,15 @@ export function AppProvider({ children }) {
     workspaces,
     setWorkspaces,
     addWorkspace,
+    removeWorkspace(workspaceId) {
+      workspaceRequest.current += 1;
+      setWorkspaces((current) => current.filter((workspace) => workspace.id !== workspaceId));
+      setActiveWorkspaceId((current) =>
+        current === workspaceId
+          ? workspaces.find((workspace) => workspace.id !== workspaceId)?.id || null
+          : current,
+      );
+    },
     activeWorkspaceId,
     setActiveWorkspaceId,
     activeWorkspace: getActiveWorkspace(),

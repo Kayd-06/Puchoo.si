@@ -33,9 +33,9 @@
 }
 html[data-theme='light'] .member-role-menu {
   background: #ffffff;
-  border-color: #cdd3db;
-  color: #27313d;
-  box-shadow: 0 12px 32px #2030401f;
+  border-color: #d4d0c7;
+  color: #20201e;
+  box-shadow: 0 12px 32px #393b301f;
 }
 .member-role-menu button {
   display: flex;
@@ -59,14 +59,14 @@ html[data-theme='light'] .member-role-menu {
   font-weight: 600;
 }
 html[data-theme='light'] .member-role-menu button[aria-selected='true'] {
-  background: #e8eef5;
-  color: #3f5f86;
+  background: #e7e1d0;
+  color: #292925;
 }
 .member-role-menu button:hover {
   background: #2a2925;
 }
 html[data-theme='light'] .member-role-menu button:hover {
-  background: #edf2f8;
+  background: #ece8db;
 }
 .member-role-menu button:focus-visible {
   outline: 2px solid #c4bba9;
