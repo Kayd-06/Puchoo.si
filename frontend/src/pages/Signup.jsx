@@ -31,6 +31,12 @@ export default function Signup() {
 
   function update(key, value) {
     setValues((current) => ({ ...current, [key]: value }));
+    setErrors((current) => {
+      if (!current[key]) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
   }
 
   function validate() {
@@ -81,6 +87,9 @@ export default function Signup() {
       setPending(false);
     }
   }
+
+  const passwordsMismatch =
+    values.confirm_password.length > 0 && values.password !== values.confirm_password;
 
   return (
     <>
@@ -141,6 +150,8 @@ export default function Signup() {
             autoComplete="new-password"
             value={values.confirm_password}
             error={errors.confirm_password}
+            showStrength={false}
+            matchValue={values.password}
             onChange={(event) => update('confirm_password', event.target.value)}
           />
           <fieldset className="auth-form-wide">
@@ -207,7 +218,7 @@ export default function Signup() {
           <PillButton
             type="submit"
             variant="dark"
-            disabled={pending}
+            disabled={pending || passwordsMismatch}
             className="auth-form-wide w-full"
           >
             {pending ? 'Creating account…' : 'Get started'}
