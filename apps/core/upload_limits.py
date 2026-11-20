@@ -615,7 +615,107 @@ def read_tabular(
     return frames
 
 
+def _raw_csv_grid(contents: bytes, limits: UploadLimits, label: str) -> list[list[object]]:
+    """Read every CSV line as-is, allowing ragged rows (title lines, blank lines).
+
+    Tally and Apple Numbers exports start with one-cell title lines, which the
+    strict tabular preflight rejects. Limits are enforced while reading.
+    """
+
+    import csv
+
+    try:
+        text = contents.removeprefix(b"\xef\xbb\xbf").decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            text = contents.decode("cp1252")
+        except UnicodeDecodeError as exc:
+            raise UploadLimitError("The CSV is not valid text.", status_code=400) from exc
+    if len(text) > MAX_TEXT_BYTES:
+        raise UploadLimitError("CSV text exceeds the safe parser budget.")
+    previous_limit = csv.field_size_limit()
+    csv.field_size_limit(MAX_FIELD_BYTES)
+    rows: list[list[object]] = []
+    cells = 0
+    try:
+        for row in csv.reader(io.StringIO(text, newline="")):
+            if len(row) > limits.max_columns:
+                raise UploadLimitError(
+                    f"The CSV has {len(row):,} columns; the limit is {limits.max_columns:,}.",
+                    status_code=400,
+                )
+            rows.append(list(row))
+            cells += len(row)
+            if len(rows) > limits.max_rows:
+                raise UploadLimitError(f"{label} has more than {limits.max_rows:,} rows.", status_code=400)
+            if cells > limits.max_cells:
+                raise UploadLimitError(f"The upload has more than {limits.max_cells:,} cells.", status_code=400)
+    except csv.Error as exc:
+        raise UploadLimitError("The CSV could not be parsed safely.", status_code=400) from exc
+    finally:
+        csv.field_size_limit(previous_limit)
+    return rows
+
+
+def _raw_xlsx_grid(contents: bytes, limits: UploadLimits, label: str) -> dict[str, list[list[object]]]:
+    inspect_xlsx(contents, limits)
+    with zipfile.ZipFile(io.BytesIO(contents)) as archive:
+        if len({part.filename for part in archive.infolist()}) != len(archive.infolist()) or any(
+            part.flag_bits & 1 for part in archive.infolist()
+        ):
+            raise UploadLimitError("Duplicate or encrypted Excel parts are not supported.", status_code=400)
+        _preflight_xml(archive, limits)
+    try:
+        from openpyxl import load_workbook
+
+        workbook = load_workbook(io.BytesIO(contents), read_only=True, data_only=True)
+    except Exception as exc:
+        raise UploadLimitError("The XLSX workbook structure is invalid or unsupported.", status_code=400) from exc
+    sheets: dict[str, list[list[object]]] = {}
+    cells = 0
+    try:
+        for worksheet in workbook.worksheets:
+            rows: list[list[object]] = []
+            for row in worksheet.iter_rows(values_only=True):
+                values = list(row)
+                while values and values[-1] in (None, ""):
+                    values.pop()
+                if len(values) > limits.max_columns:
+                    raise UploadLimitError(
+                        f"{label} has {len(values):,} columns; the limit is {limits.max_columns:,}.",
+                        status_code=400,
+                    )
+                rows.append(values)
+                cells += len(values)
+                if len(rows) > limits.max_rows:
+                    raise UploadLimitError(f"{label} has more than {limits.max_rows:,} rows.", status_code=400)
+                if cells > limits.max_cells:
+                    raise UploadLimitError(f"The upload has more than {limits.max_cells:,} cells.", status_code=400)
+            sheets[worksheet.title] = rows
+    finally:
+        workbook.close()
+    return sheets
+
+
+def read_raw_grid(
+    filename: str, contents: bytes, limits: UploadLimits | None = None
+) -> dict[str, list[list[object]]]:
+    """Return each sheet as raw rows (no header guessing), within upload limits."""
+
+    limits = bounded_limits(limits or UploadLimits.from_env())
+    if len(contents) > MAX_INPUT_BYTES:
+        raise UploadLimitError("Upload exceeds the 25 MiB hard parser input budget.")
+    suffix = os.path.splitext(filename)[1].lower()
+    stem = os.path.splitext(os.path.basename(filename))[0] or "sheet"
+    if suffix == ".csv":
+        return {stem: _raw_csv_grid(contents, limits, filename)}
+    if suffix == ".xlsx":
+        return _raw_xlsx_grid(contents, limits, filename)
+    raise ValueError("Upload a CSV or XLSX file.")
+
+
 __all__ = [
+    "read_raw_grid",
     "UploadLimitError",
     "UploadLimits",
     "check_frame",
