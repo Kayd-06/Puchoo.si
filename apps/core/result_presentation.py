@@ -15,6 +15,10 @@ class ResultPresentation:
     headline: str
     detail: str
     highlights: list[tuple[str, str]]
+    # Set when the headline is "<label>: <value>", so a translator can be
+    # given the label alone and the value can stay on the server.
+    headline_label: str | None = None
+    headline_value: str | None = None
 
 
 def humanize_column(name: str) -> str:
@@ -53,15 +57,19 @@ def build_result_presentation(
             column for column in columns if isinstance(row.get(column), Real) and not isinstance(row.get(column), bool)
         ]
         highlights = [(humanize_column(column), format_result_value(row[column])) for column in numeric_columns[:3]]
+        label = value = None
         if len(numeric_columns) == 1:
             column = numeric_columns[0]
-            headline = f"{humanize_column(column)}: {format_result_value(row[column])}"
+            label, value = humanize_column(column), format_result_value(row[column])
+            headline = f"{label}: {value}"
         else:
             headline = "One matching result was found."
         return ResultPresentation(
             headline=headline,
             detail="This answer is based on one result returned by the validated read-only query.",
             highlights=highlights,
+            headline_label=label,
+            headline_value=value,
         )
 
     return ResultPresentation(

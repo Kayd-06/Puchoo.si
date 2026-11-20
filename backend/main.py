@@ -14,7 +14,10 @@ from backend.config import settings
 from backend.csrf import CSRFCookieMiddleware
 from backend.database import init_db
 from backend.routers.auth import router as auth_router
+from apps.core.data_privacy import install_log_redaction
 
+# Scrub log records before any handler (uvicorn, Render) can print them.
+install_log_redaction()
 logger = logging.getLogger(__name__)
 
 

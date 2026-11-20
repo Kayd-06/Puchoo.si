@@ -247,13 +247,19 @@ class SessionManager:
         return receipt[0]
 
     def remove_workspace(self, workspace_id):
-        from backend.models import WorkspaceRecord
+        from sqlalchemy import delete
+        from backend.models import Notification, PendingQuery, WorkspaceRecord
         from backend.memory_deletions import enqueue
         removed = None
         def action(db):
             record = db.get(WorkspaceRecord, workspace_id)
             if record is not None:
                 enqueue(db, record.tenant_id, workspace_id)
+                # Pending proposals keep the question and SQL literals, and
+                # notifications name the source; neither outlives the data.
+                db.execute(delete(PendingQuery).where(
+                    PendingQuery.workspace_id == workspace_id, PendingQuery.tenant_id == record.tenant_id))
+                db.execute(delete(Notification).where(Notification.resource_id == workspace_id))
                 db.delete(record)
         with self._edit(db_action=action):
             removed = self.workspaces.pop(workspace_id, None)
@@ -263,6 +269,11 @@ class SessionManager:
             self.schema_snapshots.pop(f"schema_{workspace_id}", None)
             self.active_proposals.pop(workspace_id, None)
         uri = removed.get("database_uri") if isinstance(removed, dict) else None
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
         with STATE_LOCK:
             if uri and not any(ws.get("database_uri") == uri for ws in self.workspaces.values()):
                 from apps.core.workspaces import delete_workspace_files

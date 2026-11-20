@@ -1009,6 +1009,7 @@ def test_verifier_exception_body_is_not_returned_logged_or_persisted(env, monkey
 
 def test_localized_presentation_survives_history_reload_with_facts_unchanged(env, monkeypatch):
     pending = env.generate().json()
+    monkeypatch.setenv('PUCHOO_TRANSLATE_RESULT_VALUES', '1')
     class SyntheticTranslator:
         def translate(self, text, *args, **kwargs):
             return 'हिन्दी ' + text
