@@ -123,6 +123,28 @@ describe('role-aware product surfaces', () => {
     renderRoute(<ConnectData />);
     expect(document.getElementById('fileUpload')).toHaveAttribute('accept', '.csv,.xlsx');
     expect(screen.getByText(/upload CSV or Excel files/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tally Sales Register and Balance Sheet exports \(XLSX or CSV\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the same file be chosen again after a rejected selection', () => {
+    renderRoute(<ConnectData />);
+    const input = document.getElementById('fileUpload');
+    let cleared = false;
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => descriptor.get.call(input),
+      set: (next) => {
+        if (next === '') cleared = true;
+        descriptor.set.call(input, next);
+      },
+    });
+    const file = new File(['x'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(screen.getByText('Choose up to 20 CSV or XLSX files.')).toBeInTheDocument();
+    expect(cleared).toBe(true);
   });
 
   it('updates the decorative source word for upload, server and selected files', () => {

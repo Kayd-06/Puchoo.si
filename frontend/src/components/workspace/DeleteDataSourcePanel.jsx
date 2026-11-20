@@ -9,25 +9,34 @@ export default function DeleteDataSourcePanel() {
   const { activeWorkspace, removeWorkspace } = useAppContext();
   const { user } = useAuth();
   const [deletedName, setDeletedName] = useState('');
-  return (
-    <>
-      {deletedName && (
+  // After a delete, show only the outcome. The next source's panel stays hidden
+  // until the owner dismisses it, so a second delete is always a deliberate step.
+  if (deletedName) {
+    return (
+      <section
+        className="settings-section settings-danger-zone settings-delete-source settings-source-delete-done"
+        aria-label="Data source deleted"
+      >
         <p role="status" className="settings-source-delete-feedback">
           {deletedName} was deleted. Your organization and accounts are unchanged.
         </p>
-      )}
-      {activeWorkspace && (
-        <SourceConfirmation
-          key={activeWorkspace.id}
-          source={activeWorkspace}
-          onDeleted={() => {
-            invalidateHistory(chatScope(user, activeWorkspace.id));
-            setDeletedName(activeWorkspace.name);
-            removeWorkspace(activeWorkspace.id);
-          }}
-        />
-      )}
-    </>
+        <button type="button" className="settings-action" onClick={() => setDeletedName('')}>
+          Done
+        </button>
+      </section>
+    );
+  }
+  if (!activeWorkspace) return null;
+  return (
+    <SourceConfirmation
+      key={activeWorkspace.id}
+      source={activeWorkspace}
+      onDeleted={() => {
+        invalidateHistory(chatScope(user, activeWorkspace.id));
+        setDeletedName(activeWorkspace.name);
+        removeWorkspace(activeWorkspace.id);
+      }}
+    />
   );
 }
 

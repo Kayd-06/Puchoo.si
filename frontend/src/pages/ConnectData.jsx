@@ -360,12 +360,19 @@ export default function ConnectData() {
               <div className="connect-upload-flow">
                 <h1>Upload your data</h1>
                 <p>Upload CSV or Excel files, up to 20 at once.</p>
+                <p className="connect-upload-note">
+                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported.
+                </p>
                 <input
                   id="fileUpload"
                   type="file"
                   multiple
                   accept={ACCEPTED_FILES}
-                  onChange={(event) => selectFiles(event.target.files)}
+                  onChange={(event) => {
+                    selectFiles(event.target.files);
+                    // Allow choosing the same file again after an error or reset.
+                    event.target.value = '';
+                  }}
                   disabled={uploading}
                   className="connect-file-input"
                 />

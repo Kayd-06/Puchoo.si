@@ -92,6 +92,8 @@ it('uses a separate light orbit and keeps the burst paused until switching to da
   const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   document.documentElement.dataset.theme = 'light';
   const { container, unmount } = render(<CalculatingStatus />);
+  // Only metadata up front: light theme and reduced motion never download the clip.
+  expect(container.querySelector('video')).toHaveAttribute('preload', 'metadata');
   expect(container.querySelector('.calculating-light-orbit')).toHaveAttribute(
     'aria-hidden',
     'true',

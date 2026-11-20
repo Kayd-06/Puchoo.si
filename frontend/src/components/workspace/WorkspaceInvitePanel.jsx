@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 
 const roleCopy = {
   admin:
-    'Can administer this shared workspace, manage data, rotate invite codes, and manage members.',
+    'Can administer this shared workspace, add and connect sources, rotate invite codes, and manage members. Only the owner can delete sources.',
   editor:
     'Can query existing data and review history, but cannot add, connect, delete, or configure sources.',
   viewer:

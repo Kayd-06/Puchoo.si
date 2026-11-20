@@ -260,6 +260,12 @@ html[data-theme='light'] .settings-page {
   border-radius: 15px;
   border-color: var(--settings-line);
 }
+#root .app-container .settings-page .settings-delete-source.settings-source-delete-done {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+#root .app-container .settings-page .settings-source-delete-done .settings-source-delete-feedback {
+  grid-column: auto;
+}
 #root .app-container .settings-page .settings-delete-source-icon {
   display: grid;
   place-items: center;

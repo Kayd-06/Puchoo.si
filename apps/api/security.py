@@ -125,5 +125,5 @@ def require_workspace_owner(
     user=Depends(current_user),
 ):
     if effective_role(user) != "owner":
-        raise HTTPException(status_code=403, detail="Only the owner can delete a data source.")
+        raise HTTPException(status_code=403, detail="Only the workspace owner can make this change.")
     return workspace

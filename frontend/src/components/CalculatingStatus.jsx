@@ -54,7 +54,7 @@ export default function CalculatingStatus() {
           muted
           loop
           playsInline
-          preload="auto"
+          preload="metadata"
           disableRemotePlayback
           tabIndex={-1}
           aria-hidden="true"

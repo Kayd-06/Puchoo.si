@@ -440,6 +440,10 @@ def update_workspace_member_role(
 
 class DeleteOrganizationRequest(BaseModel):
     confirmation: str = Field(min_length=1, max_length=200)
+    current_password: str = Field(min_length=1, max_length=1_024)
+
+
+ORGANIZATION_DELETE_ERROR = "The password or name you entered is incorrect."
 
 
 @router.delete("/workspace", status_code=204)
@@ -448,15 +452,22 @@ def delete_organization(
     request: Request,
     user: User = Depends(current_user),
 ) -> Response:
+    """Wipe the owner's whole organization after a fresh password check."""
+
     enforce_csrf(request)
+    _rate_limit("organization-delete", request, user.id)
     if effective_role(user) != "owner" or user.workspace_type not in {"business", "institution", "institute"}:
         raise HTTPException(status_code=403, detail="Only the business or school owner can delete it.")
+    # Always pay for the hash check, and give one answer for either mistake.
+    password_ok = verify_password(body.current_password, user.password_hash)
     name = user.workspace_name or user.institute_name
-    if not name or body.confirmation != name:
-        raise HTTPException(status_code=400, detail="Enter the exact business or school name to confirm deletion.")
+    if not (password_ok and name and body.confirmation == name):
+        raise HTTPException(status_code=400, detail=ORGANIZATION_DELETE_ERROR)
     from apps.api.session import session_manager
 
-    session_manager.remove_organization(user.id)
+    removed_accounts = session_manager.remove_organization(user.id)
+    # Audit trail: identifiers and counts only, never names or emails.
+    logger.info("organization_deleted tenant_id=%s accounts_removed=%d", user.id, removed_accounts)
     response = Response(status_code=204)
     clear_session_cookie(response)
     clear_login_challenge_cookie(response)

@@ -55,8 +55,37 @@ it('requires the exact name and states that member accounts will be deleted', as
   fireEvent.change(screen.getByLabelText('Type Northstar to confirm'), {
     target: { value: 'Northstar' },
   });
+  // The exact name alone is not enough: the owner must re-enter their password.
+  expect(confirm).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Your current password'), {
+    target: { value: 'owner-password' },
+  });
+  expect(confirm).toBeEnabled();
   fireEvent.click(confirm);
-  await waitFor(() => expect(deleteOrganization).toHaveBeenCalledWith('Northstar'));
+  await waitFor(() =>
+    expect(deleteOrganization).toHaveBeenCalledWith('Northstar', 'owner-password'),
+  );
+});
+
+it('keeps the organization and clears the password when the server rejects it', async () => {
+  deleteOrganization.mockRejectedValue(new Error('The password or name you entered is incorrect.'));
+  render(
+    <MemoryRouter>
+      <Settings />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Organization controls' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete business' }));
+  fireEvent.change(screen.getByLabelText('Type Northstar to confirm'), {
+    target: { value: 'Northstar' },
+  });
+  const password = screen.getByLabelText('Your current password');
+  expect(password).toHaveAttribute('type', 'password');
+  fireEvent.change(password, { target: { value: 'wrong-password' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Permanently delete business' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('password or name');
+  expect(password).toHaveValue('');
+  expect(screen.getByRole('button', { name: 'Permanently delete business' })).toBeDisabled();
 });
 
 it.each(['institution', 'institute'])('uses the school category for %s accounts', (type) => {
@@ -88,6 +117,35 @@ it('names the selected source and deletes it without deleting the organization',
   );
   expect(deleteOrganization).not.toHaveBeenCalled();
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('School1 was deleted'));
+});
+
+it('collapses after a source delete and shows only the outcome until dismissed', async () => {
+  fetchApi.mockResolvedValue(null);
+  const { rerender } = render(
+    <MemoryRouter>
+      <Settings />
+    </MemoryRouter>,
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Delete data source' }));
+  fireEvent.change(screen.getByLabelText('Type School1 to confirm'), {
+    target: { value: 'School1' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Permanently delete data source' }));
+  await screen.findByText(/School1 was deleted/);
+  // The context selects the next source; its delete controls must not appear on their own.
+  source = { id: 'reports', name: 'Reports', source_type: 'spreadsheet' };
+  rerender(
+    <MemoryRouter>
+      <Settings />
+    </MemoryRouter>,
+  );
+  expect(screen.queryByRole('heading', { name: 'Delete Reports' })).not.toBeInTheDocument();
+  expect(screen.queryByLabelText(/to confirm/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+  expect(screen.queryByText(/School1 was deleted/)).not.toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: 'Delete Reports' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Delete data source' })).toBeInTheDocument();
+  expect(screen.queryByLabelText('Type Reports to confirm')).not.toBeInTheDocument();
 });
 
 it('shows only selected-source deletion initially and resets confirmation after switching sources', async () => {

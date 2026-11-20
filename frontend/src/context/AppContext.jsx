@@ -11,6 +11,11 @@ export function AppProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const workspaceRequest = useRef(0);
+  // Latest committed list, so callbacks never pick a fallback from a stale render.
+  const workspacesRef = useRef(workspaces);
+  useEffect(() => {
+    workspacesRef.current = workspaces;
+  }, [workspaces]);
 
   const setActiveWorkspaceId = useCallback((workspaceIdOrUpdater) => {
     setActiveWorkspaceIdState((currentId) => {
@@ -40,6 +45,19 @@ export function AppProvider({ children }) {
     workspaceRequest.current += 1;
     setWorkspaces((current) => [...current.filter((item) => item.id !== workspace.id), workspace]);
   }, []);
+
+  const removeWorkspace = useCallback(
+    (workspaceId) => {
+      workspaceRequest.current += 1;
+      const remaining = workspacesRef.current.filter((workspace) => workspace.id !== workspaceId);
+      workspacesRef.current = remaining;
+      setWorkspaces((current) => current.filter((workspace) => workspace.id !== workspaceId));
+      setActiveWorkspaceId((currentId) =>
+        currentId === workspaceId ? remaining[0]?.id || null : currentId,
+      );
+    },
+    [setActiveWorkspaceId],
+  );
 
   // Load initial data
   useEffect(() => {
@@ -96,15 +114,7 @@ export function AppProvider({ children }) {
     workspaces,
     setWorkspaces,
     addWorkspace,
-    removeWorkspace(workspaceId) {
-      workspaceRequest.current += 1;
-      setWorkspaces((current) => current.filter((workspace) => workspace.id !== workspaceId));
-      setActiveWorkspaceId((current) =>
-        current === workspaceId
-          ? workspaces.find((workspace) => workspace.id !== workspaceId)?.id || null
-          : current,
-      );
-    },
+    removeWorkspace,
     activeWorkspaceId,
     setActiveWorkspaceId,
     activeWorkspace: getActiveWorkspace(),

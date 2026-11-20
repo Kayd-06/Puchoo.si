@@ -10,6 +10,7 @@ export default function OrganizationDeletePanel() {
   const detailsId = useId();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [confirmation, setConfirmation] = useState('');
+  const [password, setPassword] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const organizationName = user?.workspace_name || user?.institute_name || '';
@@ -21,13 +22,14 @@ export default function OrganizationDeletePanel() {
 
   async function confirmDeletion(event) {
     event.preventDefault();
-    if (deleting || !organizationName || confirmation !== organizationName) return;
+    if (deleting || !organizationName || confirmation !== organizationName || !password) return;
     setDeleting(true);
     setDeleteError('');
     try {
-      await deleteOrganization(confirmation);
+      await deleteOrganization(confirmation, password);
       navigate('/login', { replace: true });
     } catch (error) {
+      setPassword('');
       setDeleteError(error.message || 'Could not delete the organization. Please try again.');
       setDeleting(false);
     }
@@ -47,6 +49,7 @@ export default function OrganizationDeletePanel() {
           setExpanded((value) => !value);
           setDeleteOpen(false);
           setConfirmation('');
+          setPassword('');
           setDeleteError('');
         }}
       >
@@ -98,6 +101,16 @@ export default function OrganizationDeletePanel() {
                   autoComplete="off"
                   autoFocus
                 />
+                <label htmlFor="organization-password">Your current password</label>
+                <input
+                  id="organization-password"
+                  type="password"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  disabled={deleting}
+                  autoComplete="current-password"
+                  maxLength={1024}
+                />
                 {deleteError && <p role="alert">{deleteError}</p>}
                 <div className="organization-delete-actions">
                   <button
@@ -107,6 +120,7 @@ export default function OrganizationDeletePanel() {
                     onClick={() => {
                       setDeleteOpen(false);
                       setConfirmation('');
+                      setPassword('');
                       setDeleteError('');
                     }}
                   >
@@ -115,7 +129,12 @@ export default function OrganizationDeletePanel() {
                   <button
                     type="submit"
                     className="organization-delete-button"
-                    disabled={deleting || !organizationName || confirmation !== organizationName}
+                    disabled={
+                      deleting ||
+                      !organizationName ||
+                      confirmation !== organizationName ||
+                      !password
+                    }
                   >
                     {deleting ? 'Deleting…' : `Permanently delete ${organizationKind}`}
                   </button>
