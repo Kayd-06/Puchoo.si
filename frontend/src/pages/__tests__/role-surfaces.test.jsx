@@ -123,6 +123,42 @@ describe('role-aware product surfaces', () => {
     renderRoute(<ConnectData />);
     expect(document.getElementById('fileUpload')).toHaveAttribute('accept', '.csv,.xlsx');
     expect(screen.getByText(/upload CSV or Excel files/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Tally Sales Register and Balance Sheet exports \(XLSX or CSV\)/),
+    ).toBeInTheDocument();
+  });
+
+  it('lets the same file be chosen again after a rejected selection', () => {
+    renderRoute(<ConnectData />);
+    const input = document.getElementById('fileUpload');
+    let cleared = false;
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+    Object.defineProperty(input, 'value', {
+      configurable: true,
+      get: () => descriptor.get.call(input),
+      set: (next) => {
+        if (next === '') cleared = true;
+        descriptor.set.call(input, next);
+      },
+    });
+    const file = new File(['x'], 'notes.txt', { type: 'text/plain' });
+    fireEvent.change(input, { target: { files: [file] } });
+    expect(screen.getByText('Choose up to 20 CSV or XLSX files.')).toBeInTheDocument();
+    expect(cleared).toBe(true);
+  });
+
+  it('updates the decorative source word for upload, server and selected files', () => {
+    renderRoute(<ConnectData />);
+    expect(screen.getByText('DATA')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /connect server/i }));
+    expect(screen.getByText('LINK')).toBeInTheDocument();
+    expect(screen.queryByText('DATA')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('tab', { name: /upload files/i }));
+    const file = new File(['id,total\n1,20'], 'sales.csv', { type: 'text/csv' });
+    fireEvent.change(document.getElementById('fileUpload'), { target: { files: [file] } });
+    expect(screen.getByText('READY')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Remove sales.csv' }));
+    expect(screen.getByText('DATA')).toBeInTheDocument();
   });
 
   it('viewer sees history and account settings only', () => {
@@ -136,6 +172,27 @@ describe('role-aware product surfaces', () => {
     expect(screen.getByText('Upload image')).toBeInTheDocument();
     expect(screen.queryByText('Invite management')).not.toBeInTheDocument();
     expect(screen.getByText('Business · viewer')).toBeInTheDocument();
+  });
+
+  it('keeps database connection fields available after switching tabs', () => {
+    renderRoute(<ConnectData />);
+    fireEvent.click(screen.getByRole('tab', { name: /connect server/i }));
+    expect(screen.getByRole('tab', { name: /connect server/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    for (const name of [
+      'Workspace name',
+      'Server host',
+      'Database name',
+      'Read-only username',
+      'Password',
+    ]) {
+      expect(screen.getByLabelText(name)).toBeInTheDocument();
+    }
+    fireEvent.change(screen.getByLabelText('Database engine'), { target: { value: 'mysql' } });
+    expect(screen.getByLabelText('Database port')).toHaveValue(3306);
+    expect(screen.getByRole('button', { name: /connect source/i })).toBeEnabled();
   });
 
   it('capabilities deny missing and unknown permissions', () => {
@@ -159,6 +216,75 @@ describe('role-aware product surfaces', () => {
     expect(screen.queryByRole('tab', { name: /image link/i })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText(/https:\/\//)).not.toBeInTheDocument();
     expect(screen.getAllByText(/200 KB/).length).toBeGreaterThan(0);
+  });
+
+  it('flips one card and exposes only its active face', () => {
+    setRole('owner');
+    const { container } = renderRoute(<Settings />);
+    expect(container.querySelectorAll('.profile-identity-sheet')).toHaveLength(1);
+    expect(container.querySelectorAll('.profile-layer')).toHaveLength(0);
+    const front = container.querySelector('.profile-card-front');
+    const back = container.querySelector('.profile-card-back');
+    expect(front).toHaveAttribute('aria-hidden', 'false');
+    expect(back).toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'View profile details' }));
+    expect(front).toHaveAttribute('aria-hidden', 'true');
+    expect(back).toHaveAttribute('aria-hidden', 'false');
+    fireEvent.click(screen.getByRole('button', { name: 'Hide profile details' }));
+    expect(front).toHaveAttribute('aria-hidden', 'false');
+    expect(back).toHaveAttribute('aria-hidden', 'true');
+  });
+
+  it('reveals real profile details without introducing payment controls', () => {
+    setRole('owner');
+    renderRoute(<Settings />);
+    const reveal = screen.getByRole('button', { name: 'View profile details' });
+    expect(reveal).toHaveAttribute('aria-expanded', 'false');
+    fireEvent.click(reveal);
+    expect(screen.getByRole('button', { name: 'Hide profile details' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('switch', { name: 'Show email' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Show workspace details' }));
+    expect(screen.getByRole('heading', { name: 'Ada Lovelace' })).toBeVisible();
+    expect(screen.getByRole('switch', { name: 'Show email' })).toHaveTextContent('ada@example.com');
+    expect(screen.getByRole('switch', { name: 'Show workspace details' })).toHaveTextContent(
+      'Acme',
+    );
+    expect(screen.getByText('Change email')).toBeInTheDocument();
+    expect(screen.queryByText(/CVV|View PIN|Lock card|card number/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide profile details' }));
+    expect(screen.queryByText('ada@example.com')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload image' })).toBeVisible();
+  });
+
+  it('independently reveals email and workspace data and masks them again when closed', () => {
+    setRole('owner');
+    renderRoute(<Settings />);
+    fireEvent.click(screen.getByRole('button', { name: 'View profile details' }));
+    const email = screen.getByRole('switch', { name: 'Show email' });
+    const workspace = screen.getByRole('switch', { name: 'Show workspace details' });
+    expect(email).toHaveAttribute('aria-checked', 'false');
+    expect(workspace).toHaveAttribute('aria-checked', 'false');
+    expect(screen.queryByText('ada@example.com')).not.toBeInTheDocument();
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
+    fireEvent.click(email);
+    expect(email).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('switch', { name: 'Show email' })).toHaveTextContent('ada@example.com');
+    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
+    fireEvent.click(workspace);
+    expect(screen.getByRole('switch', { name: 'Show workspace details' })).toHaveTextContent(
+      'Acme',
+    );
+    fireEvent.click(email);
+    expect(screen.queryByText('ada@example.com')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Hide profile details' }));
+    fireEvent.click(screen.getByRole('button', { name: 'View profile details' }));
+    expect(screen.getByRole('switch', { name: 'Show workspace details' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
 
   it('uses the account image in the top bar', () => {

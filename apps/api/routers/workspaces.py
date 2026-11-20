@@ -42,7 +42,7 @@ from apps.api.security import (
     require_capability,
     require_connection_admin,
     require_data_manager,
-    require_workspace_admin,
+    require_workspace_owner,
     require_workspace_editor,
     tenant_owner_id,
 )
@@ -417,7 +417,7 @@ def get_workspace(workspace: Dict = Depends(require_workspace_editor)) -> Dict[s
     return _public_workspace(workspace)
 
 @router.delete("/{workspace_id}")
-def delete_workspace(workspace_id: str, workspace: Dict = Depends(require_workspace_admin)) -> Response:
+def delete_workspace(workspace_id: str, workspace: Dict = Depends(require_workspace_owner)) -> Response:
     session_manager.remove_workspace(workspace_id)
     return Response(status_code=204)
 

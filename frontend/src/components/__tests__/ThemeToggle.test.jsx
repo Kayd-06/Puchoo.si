@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -41,6 +42,32 @@ describe('ThemeToggle', () => {
 
     expect(document.documentElement).toHaveAttribute('data-theme', 'light');
     expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
+  });
+
+  it('exposes a persistent pressed state for the active light theme', () => {
+    localStorage.setItem('puchoo:theme', 'light');
+    renderWithTheme(<ThemeToggle />);
+    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Switch to dark mode' }));
+    expect(localStorage.getItem('puchoo:theme')).toBe('dark');
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
+
+  it('supports keyboard activation without moving focus', async () => {
+    const user = userEvent.setup();
+    renderWithTheme(<ThemeToggle />);
+    await user.tab();
+    await user.keyboard(' ');
+    const toggle = screen.getByRole('button', { name: 'Switch to dark mode' });
+    expect(toggle).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByRole('button', { name: 'Switch to light mode' })).toHaveFocus();
   });
 
   it('is not available in the authentication shell', () => {

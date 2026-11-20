@@ -26,6 +26,7 @@ import {
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { can } from '../auth/capabilities';
+import CalculatingStatus from '../components/CalculatingStatus';
 import SharedDataEmptyState from '../components/workspace/SharedDataEmptyState';
 import {
   useChatState,
@@ -1433,17 +1434,6 @@ export default function AskData() {
                 aria-describedby={loading ? 'query-processing-status' : undefined}
                 rows="3"
               />
-              {loading && (
-                <div className="ask-composer-status" role="status">
-                  <span
-                    id="query-processing-status"
-                    className="ask-query-mode ask-query-processing"
-                  >
-                    <i aria-hidden="true" />
-                    Analyzing data…
-                  </span>
-                </div>
-              )}
               <div className="ask-prompt-controls">
                 <div className="ask-prompt-meta">
                   <span>
@@ -1485,7 +1475,7 @@ export default function AskData() {
                   </span>
                 </div>
                 <div className="ask-prompt-actions">
-                  {question && (
+                  {question && !loading && (
                     <button
                       className="ask-clear-button"
                       type="button"
@@ -1497,19 +1487,19 @@ export default function AskData() {
                       Clear
                     </button>
                   )}
-                  <button
-                    className="ask-submit-button"
-                    type="button"
-                    onClick={handleAsk}
-                    disabled={loading || !question.trim()}
-                    aria-label="Run secure query"
-                  >
-                    {loading ? (
-                      <LoaderCircle size={19} className="voice-spinner" />
-                    ) : (
+                  {loading ? (
+                    <CalculatingStatus />
+                  ) : (
+                    <button
+                      className="ask-submit-button"
+                      type="button"
+                      onClick={handleAsk}
+                      disabled={!question.trim()}
+                      aria-label="Run secure query"
+                    >
                       <ArrowUpRight size={20} />
-                    )}
-                  </button>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

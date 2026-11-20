@@ -280,6 +280,49 @@ class SessionManager:
                 delete_workspace_files(uri)
 
     @serialized
+    def remove_organization(self, tenant_id):
+        """Commit account/source deletion together, then discard derived local state."""
+        from sqlalchemy import delete, func, select
+        from backend import database
+        from backend.models import User, WorkspaceRecord
+        from backend.memory_deletions import enqueue
+        from apps.core.workspaces import delete_workspace_files
+
+        uris = set()
+        with database.SessionLocal() as db:
+            records = db.scalars(select(WorkspaceRecord).where(WorkspaceRecord.tenant_id == tenant_id)).all()
+            for record in records:
+                enqueue(db, tenant_id, record.id)
+                if record.source_type != "server" and record.source_ref:
+                    uris.add(f"sqlite:///{record.source_ref}")
+            # Match the canonical tenant policy, including legacy institution members.
+            removed_accounts = db.execute(delete(User).where(func.coalesce(
+                User.workspace_owner_id, User.institute_owner_id, User.id,
+            ) == tenant_id)).rowcount or 0
+            db.commit()
+        for workspace_id, workspace in list(self.workspaces.items()):
+            if workspace.get("owner_user_id") != tenant_id:
+                continue
+            if workspace.get("source_type") != "server" and workspace.get("database_uri"):
+                uris.add(workspace["database_uri"])
+            self.workspaces.pop(workspace_id, None)
+            self.workspace_guardrails.pop(workspace_id, None)
+            self.query_history.pop(workspace_id, None)
+            self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+            self.active_proposals.pop(workspace_id, None)
+        self._invalidate_tenant_refresh(tenant_id)
+        self.save()
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        for uri in uris:
+            if not any(ws.get("database_uri") == uri for ws in self.workspaces.values()):
+                delete_workspace_files(uri)
+        return removed_accounts
+
+    @serialized
     def save(self, active_workspace_id=None, db_action=None):
         """SQL commits before the derived, best-effort JSON checkpoint."""
         if active_workspace_id is not None or db_action is not None:

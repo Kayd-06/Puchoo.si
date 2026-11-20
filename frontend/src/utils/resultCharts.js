@@ -95,7 +95,20 @@ export function chartTypes(data, xType, measureCount = 1) {
 }
 export function defaultChart(record) {
   const { types, dimensions, measures } = chartColumns(record);
-  if ((record.rows || []).length < 2 || !measures.length) return null;
+  // A chart needs multiple observations and more than a standalone column.
+  if ((record.rows || []).length < 2 || (record.columns || []).length < 2) return null;
+  if (!measures.length) {
+    // Detail lists still support truthful distributions, without summing identifiers.
+    const x = dimensions.find((column) => {
+      if (types[column] !== 'category' || /(^id$|_id$|^id_|Id$|ID$)/.test(column)) return false;
+      const values = record.rows
+        .map((row) => row[column])
+        .filter((v) => v !== null && v !== undefined && v !== '');
+      const count = new Set(values.map(String)).size;
+      return count >= 2 && count <= 20 && count < values.length;
+    });
+    return x ? { x, y: '__row_count', type: 'bar', aggregation: 'count' } : null;
+  }
   const y = measures[0];
   const x =
     dimensions.find((c) => types[c] === 'date') ||
@@ -125,7 +138,11 @@ export function resolveChart(record, config) {
   const y = measures.includes(saved.y) ? saved.y : initial.y;
   const x =
     dimensions.includes(saved.x) && saved.x !== y ? saved.x : dimensions.find((c) => c !== y);
-  const aggregation = AGGREGATIONS.includes(saved.aggregation) ? saved.aggregation : 'none';
+  const aggregation = !measures.length
+    ? 'count'
+    : AGGREGATIONS.includes(saved.aggregation)
+      ? saved.aggregation
+      : 'none';
   const raw = chartData(record, x, y, aggregation, saved.type === 'scatter');
   const secondaryOptions = measures.filter((c) => c !== y && c !== x);
   const secondary = secondaryOptions.includes(saved.secondary)

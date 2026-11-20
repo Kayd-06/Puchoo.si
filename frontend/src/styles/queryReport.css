@@ -10,11 +10,11 @@
   color: var(--report-text);
 }
 html[data-theme='light'] #root .app-container .ask-page .report-results {
-  --report-surface: #f2f4f6;
-  --report-subtle: #e8ebef;
-  --report-text: #27313d;
-  --report-muted: #566270;
-  --report-line: #cdd3db;
+  --report-surface: #faf9f6;
+  --report-subtle: #eeede9;
+  --report-text: #20201e;
+  --report-muted: #66645e;
+  --report-line: #d4d0c7;
   --report-success: #276347;
   --report-success-bg: #e3ede7;
 }

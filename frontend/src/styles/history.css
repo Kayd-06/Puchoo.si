@@ -18,9 +18,9 @@
 }
 html[data-theme='light'] #root .history-page-clean {
   --history-surface: #ffffff;
-  --history-text: #262626;
-  --history-muted: #666666;
-  --history-border: #dedede;
+  --history-text: #292925;
+  --history-muted: #65675c;
+  --history-border: #d0cec2;
   --history-success: #56534c;
   --history-success-bg: #f5f2eb;
   --history-review: #7a4d00;

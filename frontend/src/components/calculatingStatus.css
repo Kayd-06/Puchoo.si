@@ -1,0 +1,194 @@
+#root .app-container .ask-page .ask-calculating-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  text-align: left;
+  pointer-events: none;
+}
+#root .ask-calculating-status .calculating-burst {
+  position: relative;
+  isolation: isolate;
+  display: block;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  border-radius: 50%;
+  mask-image: radial-gradient(circle, #000 48%, #000d 62%, transparent 74%);
+  mix-blend-mode: screen;
+  filter: contrast(1.8) brightness(1.2);
+}
+#root .ask-calculating-status .calculating-burst-poster {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+/* Crop the exact reference burst. The surrounding reference UI and text never enter the viewport. */
+#root .ask-calculating-status .calculating-burst-video {
+  position: absolute;
+  width: 270%;
+  height: 270%;
+  max-width: none;
+  left: -44%;
+  top: -128.5%;
+  object-fit: fill;
+}
+#root .ask-calculating-status .calculating-label {
+  display: inline-block;
+  font: 400 14px/1.3 var(--font-sans);
+  letter-spacing: -0.045em;
+  color: #c9e4ff;
+  background: linear-gradient(100deg, #667685 0%, #c7e5ff 28%, #f3fbff 40%, #667685 60%);
+  background-size: 250% 100%;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: calculating-text-sweep 2.2s linear infinite;
+}
+/* Light mode uses crisp vector-like orbits, rather than filtering the burst video. */
+#root .ask-calculating-status .calculating-light-orbit {
+  display: none;
+}
+html[data-theme='light'] #root .ask-calculating-status .calculating-burst {
+  display: none;
+}
+html[data-theme='light'] #root .ask-calculating-status .calculating-light-orbit {
+  position: relative;
+  display: block;
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+}
+html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-track {
+  position: absolute;
+  inset: 7px;
+  border: 1px solid #d4c9b5;
+  border-radius: 50%;
+}
+html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-core {
+  position: absolute;
+  inset: 16px;
+  border-radius: 3px;
+  background: #3e3b34;
+  animation: calculating-ink-core 2.4s ease-in-out infinite;
+}
+html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-satellite {
+  position: absolute;
+  inset: 7px;
+  border: 2px solid transparent;
+  border-top-color: #8a7355;
+  border-right-color: #3e3b34;
+  border-radius: 50%;
+  animation: calculating-ink-orbit 1.8s linear infinite;
+}
+html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-satellite::after {
+  content: '';
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  top: 0;
+  right: 0;
+  border-radius: 50%;
+  background: #8a7355;
+  box-shadow: 0 0 0 3px #faf9f6;
+}
+@keyframes calculating-ink-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes calculating-ink-core {
+  0%,
+  100% {
+    transform: rotate(0deg) scale(0.8);
+    opacity: 0.65;
+  }
+  50% {
+    transform: rotate(90deg) scale(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme='light']
+    #root
+    .calculating-light-orbit
+    :is(.calculating-orbit-core, .calculating-orbit-satellite) {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  html[data-theme='light'] #root .calculating-light-orbit > span {
+    border-color: CanvasText;
+  }
+  html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-core {
+    background: CanvasText;
+  }
+}
+html[data-theme='light'] #root .ask-calculating-status .calculating-label {
+  color: #48433b;
+  background-image: linear-gradient(100deg, #686d5d 0%, #48433b 28%, #1b1e16 40%, #686d5d 60%);
+  animation-duration: 3.2s;
+}
+#root .ask-calculating-status .calculating-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@keyframes calculating-text-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0% 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root .ask-calculating-status .calculating-burst-video {
+    display: none;
+  }
+  #root .ask-calculating-status .calculating-label {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: currentColor;
+  }
+}
+@media (forced-colors: active) {
+  #root .ask-calculating-status .calculating-label {
+    background: none;
+    -webkit-text-fill-color: CanvasText;
+    color: CanvasText;
+    animation: none;
+  }
+}
+
+@media (max-width: 420px) {
+  #root .ask-calculating-status .calculating-burst {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+  #root .ask-calculating-status .calculating-label {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 420px) {
+  html[data-theme='light'] #root .ask-calculating-status .calculating-light-orbit {
+    flex-basis: 34px;
+    width: 34px;
+    height: 34px;
+  }
+  html[data-theme='light'] #root .calculating-light-orbit .calculating-orbit-core {
+    inset: 14px;
+  }
+}

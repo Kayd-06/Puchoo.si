@@ -361,11 +361,11 @@ html[data-theme='light']
   --chart-series-6: #16a34a;
   --chart-series-7: #db2777;
   --chart-series-8: #ea580c;
-  --chart-surface: #fff;
-  --chart-panel: #f7f7f7;
-  --chart-border: #e5e5e5;
-  --chart-text: #262626;
-  --chart-muted: #737373;
+  --chart-surface: #ffffff;
+  --chart-panel: #f2f0e6;
+  --chart-border: #d8d5c8;
+  --chart-text: #292925;
+  --chart-muted: #6d7063;
 }
 #root .app-container .ask-page .result-chart-card :is(h3, strong) {
   color: var(--chart-text);

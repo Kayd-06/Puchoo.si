@@ -8,13 +8,13 @@
   --profile-tint: #2c2b26;
 }
 html[data-theme='light'] .account-profile-refined {
-  --profile-bg: #f2f4f6;
-  --profile-card: #f2f4f6;
-  --profile-line: #cdd3db;
-  --profile-text: #27313d;
-  --profile-muted: #566270;
-  --profile-accent: #3f5f86;
-  --profile-tint: #e5e9ee;
+  --profile-bg: #faf9f6;
+  --profile-card: #faf9f6;
+  --profile-line: #d4d0c7;
+  --profile-text: #20201e;
+  --profile-muted: #66645e;
+  --profile-accent: #292925;
+  --profile-tint: #e9e6d9;
 }
 #root .account-profile-refined.settings-profile {
   background: var(--profile-bg);

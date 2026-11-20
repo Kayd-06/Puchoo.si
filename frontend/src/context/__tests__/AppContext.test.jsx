@@ -91,3 +91,37 @@ it('keeps a just-uploaded source when an older list response arrives later', asy
   expect(screen.getByText('Fresh upload (2)')).toBeInTheDocument();
   expect(localStorage.getItem('pucho_active_workspace')).toBe('new-upload');
 });
+
+function RemoveSource() {
+  const { activeWorkspace, removeWorkspace } = useAppContext();
+  return (
+    <button onClick={() => removeWorkspace(activeWorkspace.id)}>Delete selected source</button>
+  );
+}
+
+it('selects another source after deletion and ignores a stale list response', async () => {
+  const pending = [];
+  fetchApi.mockImplementation((path) =>
+    path === '/workspaces/' ? new Promise((resolve) => pending.push(resolve)) : Promise.resolve({}),
+  );
+  render(
+    <AppProvider>
+      <Sources />
+      <RemoveSource />
+    </AppProvider>,
+  );
+  await waitFor(() => expect(pending).toHaveLength(1));
+  const sources = [
+    { id: 'school', name: 'School1' },
+    { id: 'reports', name: 'Reports' },
+  ];
+  await act(async () => pending[0](sources));
+  await screen.findByText('School1 (2)');
+  fireEvent(window, new Event('focus'));
+  await waitFor(() => expect(pending).toHaveLength(2));
+  fireEvent.click(screen.getByRole('button', { name: 'Delete selected source' }));
+  expect(screen.getByText('Reports (1)')).toBeInTheDocument();
+  await act(async () => pending[1](sources));
+  expect(screen.getByText('Reports (1)')).toBeInTheDocument();
+  expect(localStorage.getItem('pucho_active_workspace')).toBe('reports');
+});

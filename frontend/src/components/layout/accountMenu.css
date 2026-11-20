@@ -115,20 +115,20 @@
   background: #382530;
 }
 html[data-theme='light'] #root .topbar-account-button {
-  background: #e5e9ee;
+  background: #e9e6d9;
   border-color: #e2dfd8;
-  color: #3a3730;
+  color: #383631;
 }
 html[data-theme='light'] #root .topbar-account-button:hover,
 html[data-theme='light'] #root .topbar-account-button.is-active {
-  background: #e5e9ee;
+  background: #e9e6d9;
   border-color: #b1aea7;
 }
 html[data-theme='light'] #root .topbar-account-panel {
-  background: #f2f4f6;
+  background: #faf9f6;
   border-color: #e7e4dd;
-  color: #3a3730;
-  box-shadow: 0 16px 40px #20304020;
+  color: #383631;
+  box-shadow: 0 16px 40px #393b3020;
 }
 html[data-theme='light'] #root .topbar-account-summary {
   border-color: #eae7e0;
@@ -137,13 +137,13 @@ html[data-theme='light'] #root .topbar-account-summary strong {
   color: #36332c;
 }
 html[data-theme='light'] #root .topbar-account-summary .topbar-account-email {
-  color: #77746d;
+  color: #6c675e;
 }
 html[data-theme='light'] #root .account-menu-links button {
   color: #423f38;
 }
 html[data-theme='light'] #root .account-menu-links button:hover {
-  background: #e5e9ee;
+  background: #e9e6d9;
 }
 html[data-theme='light'] #root .topbar-account-panel .topbar-logout-button {
   color: #a72c44;
@@ -230,7 +230,7 @@ html[data-theme='light'] #root .topbar-account-panel .topbar-logout-button:hover
   outline-offset: 2px;
 }
 html[data-theme='light'] .topbar-source-select {
-  background: #f2f4f6;
+  background: #faf9f6;
   color: #25221d;
 }
 

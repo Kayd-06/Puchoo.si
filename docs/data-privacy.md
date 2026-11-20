@@ -35,12 +35,18 @@ Every log record is scrubbed when it is created, before any handler prints it:
 
 ## Deleting an upload
 
-Owners and admins (the roles that can upload) can delete a data source. That
-removes the stored SQLite file and its journal files, the report metadata
+Only the workspace owner can delete a data source (admins can still upload and
+connect sources). That removes the stored SQLite file and its journal files, the report metadata
 sidecar, the workspace row and its history (cascade), pending queries, its
 notifications, cached translations, and schedules removal of its conversation
 memory. The original uploaded file is never written to disk; it is parsed in
 memory.
+
+The owner of a business or school can also delete the whole organization from
+Settings. That needs the exact organization name and the owner's current
+password, is rate limited, and removes every account, session, invite, source
+and its derived state, including cached translations. The only log line is
+`organization_deleted` with the tenant id and the number of accounts removed.
 
 ## Real data and git
 

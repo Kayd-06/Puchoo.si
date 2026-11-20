@@ -7,12 +7,12 @@
   --history-card-tint: #2c2b26;
 }
 html[data-theme='light'] .session-history-refined {
-  --history-card-bg: #f2f4f6;
-  --history-card-line: #cdd3db;
-  --history-card-text: #27313d;
-  --history-card-muted: #566270;
-  --history-card-accent: #3f5f86;
-  --history-card-tint: #e5e9ee;
+  --history-card-bg: #faf9f6;
+  --history-card-line: #d4d0c7;
+  --history-card-text: #20201e;
+  --history-card-muted: #66645e;
+  --history-card-accent: #292925;
+  --history-card-tint: #e9e6d9;
 }
 #root .session-history-refined.settings-history {
   display: grid;
