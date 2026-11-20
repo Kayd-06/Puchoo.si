@@ -285,3 +285,36 @@ def test_raw_reader_respects_upload_limits(monkeypatch):
         read_raw_grid("bs.csv", fx.balance_sheet_csv())
     with pytest.raises(UploadLimitError):
         read_raw_grid("sales.xlsx", fx.sales_register_xlsx())
+
+
+def test_empty_amount_rows_stay_inside_the_current_group():
+    report = _balance()
+    by_account = {(row["side"], row["account"]): row for row in report.rows}
+    loans = by_account[("asset", "Loans & Advances (Asset)")]
+    assert loans["row_type"] == "item"
+    assert loans["group_name"] == "Current Assets"
+    assert loans["amount"] is None
+    for account in ("Sundry Debtors", "Cash-in-Hand", "Bank Accounts", "GST Receivable", "TCS"):
+        assert by_account[("asset", account)]["group_name"] == "Current Assets", account
+    suspense = by_account[("liability", "Suspense A/c")]
+    assert (suspense["row_type"], suspense["group_name"], suspense["amount"]) == ("item", "Current Liabilities", None)
+    assert by_account[("liability", "Profit & Loss A/c")]["row_type"] == "group"
+    assert by_account[("liability", "Opening Balance")]["group_name"] == "Profit & Loss A/c"
+    items = sum(
+        row["amount"] or 0 for row in report.rows
+        if row["group_name"] == "Current Assets" and row["row_type"] == "item"
+    )
+    assert items == fx.CURRENT_ASSETS_TOTAL
+
+
+def test_every_group_check_passes_with_empty_amount_rows():
+    report = _balance()
+    group_checks = [check for check in report.checks if "items vs group amount" in check.label]
+    assert {check.label for check in group_checks} >= {
+        "Asset group 'Current Assets': items vs group amount",
+        "Liability group 'Current Liabilities': items vs group amount",
+        "Liability group 'Profit & Loss A/c': items vs group amount",
+    }
+    assert all(check.ok for check in report.checks), report.checks
+    assert not any("add up to" in warning for warning in report.warnings), report.warnings
+    assert any("Suspense A/c" in warning for warning in report.warnings)

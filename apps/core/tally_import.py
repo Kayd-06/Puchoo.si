@@ -603,12 +603,18 @@ def _parse_side_by_side(grid: list[list[object]], layout: _Layout) -> TallyRepor
                 amount = group_value if group_value is not None else item_amount
                 text = _FLAGGED_ACCOUNTS[lowered]
                 flagged[lowered] = text.format(amount=f" of {amount:,.2f}" if amount is not None else "")
-            if item_amount is not None and group_value is None and current_group:
-                group_items.append(item_amount)
+            if group_value is None and current_group and not _CARRY.search(name):
+                # Tally prints zero-balance ledgers and sub-groups (for example
+                # "Loans & Advances (Asset)" or "Suspense A/c") with both amount
+                # columns empty in the middle of a group. They stay inside the
+                # current group so the lines after them keep the right parent.
+                if item_amount is not None:
+                    group_items.append(item_amount)
                 rows.append({
                     "report_date": as_at_text, "period_start": period_start, "period_end": period_end,
                     "side": side, "row_type": "item", "group_name": current_group, "account": name or None,
-                    "amount": _money(item_amount), "line_no": line_no, "source_report": layout.report_name,
+                    "amount": _money(item_amount) if item_amount is not None else None,
+                    "line_no": line_no, "source_report": layout.report_name,
                 })
                 continue
             close_group()

@@ -98,10 +98,12 @@ LIABILITIES = [
     ("Current Liabilities", None, "182625.00"),
     ("Duties & Taxes", "42625.00", None),
     ("Sundry Creditors", "140000.00", None),
+    # Zero-balance line printed with both amount columns empty, between the
+    # Current Liabilities items and the next group (as Tally exports it).
+    ("Suspense A/c", None, None),
     ("Profit & Loss A/c", None, "117375.00"),
     ("Opening Balance", "910000.00", None),
     ("Current Period", "-792625.00", None),
-    ("Suspense A/c", None, None),
 ]
 ASSETS = [
     ("Fixed Assets", None, "300000.00"),
@@ -111,9 +113,15 @@ ASSETS = [
     ("Fixed Deposit", "50000.00", None),
     ("Current Assets", None, "695000.00"),
     ("Closing Stock", "300000.00", None),
-    ("Sundry Debtors", "245000.00", None),
+    ("Deposits (Asset)", "20000.00", None),
+    # Empty sub-group in the middle of Current Assets; the items below it
+    # still belong to Current Assets.
+    ("Loans & Advances (Asset)", None, None),
+    ("Sundry Debtors", "225000.00", None),
     ("Cash-in-Hand", "25000.00", None),
-    ("Bank Accounts", "125000.00", None),
+    ("Bank Accounts", "120000.00", None),
+    ("GST Receivable", "3000.00", None),
+    ("TCS", "2000.00", None),
     ("Difference in opening balances", None, "5000.00"),
 ]
 BALANCE_TOTAL = "1050000.00"
