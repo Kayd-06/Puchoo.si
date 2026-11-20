@@ -336,6 +336,61 @@ Columns: attendance_id (INTEGER), student_id (INTEGER), attendance_date (TEXT), 
         self.assertEqual([(1, "Asha", 75.0)], rows)
         self.assertEqual([], local_semantic_feedback(question, sql, schema))
 
+    def test_average_percentage_filters_accept_valid_alias_forms(self) -> None:
+        question = "List students whose average exam percentage is greater than 70%."
+        valid = {
+            "cte_nullif_where": (
+                "WITH s AS (SELECT st.full_name, AVG(100.0 * g.marks_obtained / NULLIF(a.maximum_marks, 0)) AS avg_pct "
+                "FROM grades g JOIN assessments a ON a.assessment_id = g.assessment_id "
+                "JOIN students st ON st.student_id = g.student_id GROUP BY st.student_id) "
+                "SELECT full_name, avg_pct FROM s WHERE avg_pct > 70"
+            ),
+            "cte_round_where": (
+                "WITH s AS (SELECT student_id, ROUND(AVG(percentage), 2) AS avg_pct FROM exam_results "
+                "GROUP BY student_id) SELECT * FROM s WHERE avg_pct > 70"
+            ),
+            "having_alias": (
+                "SELECT st.full_name, AVG(e.percentage) AS avg_pct FROM exams e "
+                "JOIN students st ON st.student_id = e.student_id GROUP BY st.student_id HAVING avg_pct > 70"
+            ),
+            "having_nullif_alias": (
+                "SELECT st.full_name, ROUND(AVG(100.0 * g.marks_obtained / NULLIF(a.maximum_marks, 0)), 1) AS avg_pct "
+                "FROM grades g JOIN assessments a USING (assessment_id) JOIN students st USING (student_id) "
+                "GROUP BY st.student_id HAVING 70 < avg_pct"
+            ),
+        }
+        for name, sql in valid.items():
+            with self.subTest(name=name):
+                self.assertEqual([], local_semantic_feedback(question, sql))
+
+    def test_average_percentage_filters_still_reject_wrong_shapes(self) -> None:
+        question = "List students whose average exam percentage is greater than 70%."
+        raw_where = local_semantic_feedback(
+            question,
+            "SELECT st.full_name, AVG(e.percentage) AS avg_pct FROM exams e JOIN students st "
+            "ON st.student_id = e.student_id WHERE e.percentage > 70 GROUP BY st.student_id",
+        )
+        self.assertEqual(["Filter an aggregate average with HAVING AVG(...) or filter its CTE alias in an outer WHERE."], raw_where)
+        having_on_other_column = local_semantic_feedback(
+            question,
+            "SELECT st.full_name, AVG(e.percentage) AS avg_pct, COUNT(*) AS exams_taken FROM exams e "
+            "JOIN students st ON st.student_id = e.student_id GROUP BY st.student_id HAVING exams_taken > 70",
+        )
+        self.assertEqual(["The HAVING clause must compare AVG(...) to the requested limit."], having_on_other_column)
+        no_average = local_semantic_feedback(
+            question, "SELECT full_name FROM exam_results WHERE percentage > 70",
+        )
+        self.assertIn("AVG", no_average[0])
+        # A non-average alias wrapping an unrelated call must not count as an average.
+        self.assertEqual(
+            ["Filter an aggregate average with HAVING AVG(...) or filter its CTE alias in an outer WHERE."],
+            local_semantic_feedback(
+                question,
+                "WITH s AS (SELECT student_id, AVG(percentage) AS avg_pct, ROUND(MAX(percentage), 1) AS best "
+                "FROM exam_results GROUP BY student_id) SELECT * FROM s WHERE best > 70",
+            ),
+        )
+
     def test_average_cte_alias_can_be_compared_on_right_side(self) -> None:
         feedback = local_semantic_feedback(
             "Show students with fee balance above the class average",
