@@ -18,6 +18,12 @@ class FakeSarvam:
         return {text: f"[{target_language}] {text}" for text in texts}
 
 
+@pytest.fixture(autouse=True)
+def opt_in_to_cell_translation(monkeypatch):
+    """These tests cover the opt-in path; the private default is tested in test_data_privacy."""
+    monkeypatch.setenv("PUCHOO_TRANSLATE_RESULT_VALUES", "1")
+
+
 @pytest.fixture
 def fake_sarvam(monkeypatch):
     FakeSarvam.calls = []

@@ -311,6 +311,34 @@ def english_only_question(question: str) -> str:
     return question.strip()
 
 
+def _average_aliases(sql_lower: str) -> list[str]:
+    """Return aliases whose select expression contains AVG(...).
+
+    Parenthesis-aware, so nested calls such as AVG(100.0 * a / NULLIF(b, 0)),
+    wrappers such as ROUND(AVG(x), 2) and window forms AVG(x) OVER (...) all count.
+    """
+
+    aliases: list[str] = []
+    for match in re.finditer(r"\bas\s+([a-z_][\w]*)", sql_lower):
+        depth = 0
+        start = match.start()
+        index = start - 1
+        while index >= 0:
+            char = sql_lower[index]
+            if char == ")":
+                depth += 1
+            elif char == "(":
+                if depth == 0:
+                    break  # Left the enclosing call or subquery.
+                depth -= 1
+            elif depth == 0 and (char == "," or re.search(r"\bselect\s*$", sql_lower[: index + 1])):
+                break
+            index -= 1
+        if re.search(r"\bavg\s*\(", sql_lower[index + 1 : start]):
+            aliases.append(match.group(1))
+    return aliases
+
+
 def local_semantic_feedback(question: str, sql: str, schema: str = "") -> list[str]:
     """Return small, transparent checks for common analytics-language errors."""
 
@@ -356,10 +384,7 @@ def local_semantic_feedback(question: str, sql: str, schema: str = "") -> list[s
             question_lower,
         ))
         if asks_to_filter_average:
-            # Include window averages, e.g. AVG(x) OVER (PARTITION BY region) AS region_avg.
-            average_aliases = re.findall(
-                r"avg\s*\([^)]*\)(?:\s*over\s*\([^)]*\))?\s+as\s+([a-z_][\w]*)", sql_lower
-            )
+            average_aliases = _average_aliases(sql_lower)
             # Any WHERE clause may filter the alias, not only the last one.
             where_parts = re.split(r"\bwhere\b", sql_lower)
             where_sql = " where ".join(where_parts[1:])
@@ -371,8 +396,15 @@ def local_semantic_feedback(question: str, sql: str, schema: str = "") -> list[s
             if "having" not in sql_lower:
                 if not filters_average_alias:
                     feedback.append("Filter an aggregate average with HAVING AVG(...) or filter its CTE alias in an outer WHERE.")
-            elif "avg(" not in sql_lower.split("having", 1)[1]:
-                feedback.append("The HAVING clause must compare AVG(...) to the requested limit.")
+            else:
+                having_sql = sql_lower.split("having", 1)[1]
+                # SQLite accepts a select alias in HAVING, e.g. HAVING avg_pct > 70.
+                if not re.search(r"\bavg\s*\(", having_sql) and not any(
+                    re.search(rf"\b(?:\w+\.)?{re.escape(alias)}\b\s*(?:>=|<=|>|<)", having_sql)
+                    or re.search(rf"(?:>=|<=|>|<)\s*(?:\w+\.)?{re.escape(alias)}\b", having_sql)
+                    for alias in average_aliases
+                ):
+                    feedback.append("The HAVING clause must compare AVG(...) to the requested limit.")
     if (re.search(r"\bunpaid\s+(?:fee|fees|amount|balance)\b", question_lower)
             and (not schema or ("amount_due" in schema_lower and "amount_paid" in schema_lower))):
         if not re.search(

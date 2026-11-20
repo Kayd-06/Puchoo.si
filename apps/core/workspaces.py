@@ -18,7 +18,14 @@ from pydantic import ValidationError
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from apps.core.guardrails import SchemaCatalog
-from apps.core.upload_limits import MAX_INPUT_BYTES, UploadLimitError, UploadLimits, read_tabular
+from apps.core.upload_limits import MAX_INPUT_BYTES, UploadLimitError, UploadLimits, read_raw_grid, read_tabular
+from apps.core import tally_import
+from apps.core.data_privacy import (
+    is_financial_report_file,
+    report_metadata_path,
+    safe_value_hint,
+    schema_value_hints_enabled,
+)
 
 from apps.core.db_connection import (
     GENERIC_CONNECTION_ERROR,
@@ -111,7 +118,8 @@ def delete_workspace_files(database_uri: object, *, root: Path | None = None) ->
     if source is None:
         return []
     removed: list[Path] = []
-    for path in (source, *(source.with_name(source.name + suffix) for suffix in ("-wal", "-shm", "-journal"))):
+    companions = (source.with_name(source.name + suffix) for suffix in ("-wal", "-shm", "-journal"))
+    for path in (source, *companions, report_metadata_path(source)):
         try:
             if path.is_symlink() or not path.is_file():
                 continue
@@ -295,6 +303,151 @@ def create_tabular_collection_workspace(
     )
 
 
+TALLY_SOURCE_TYPE = "tally_report"
+
+
+@dataclass(frozen=True)
+class UploadInspection:
+    """What a single uploaded CSV/XLSX looks like before anything is saved."""
+
+    kind: Literal["tally", "unknown", "table"]
+    report: tally_import.TallyReport | None = None
+    rows: list[list[str]] | None = None
+    suggested_header_row: int = 0
+
+
+def _first_grid(filename: str, contents: bytes) -> list[list[object]]:
+    try:
+        sheets = read_raw_grid(filename, contents)
+    except UploadLimitError:
+        raise
+    except (OSError, UnicodeDecodeError, ImportError, BadZipFile) as exc:
+        raise ValueError("The spreadsheet could not be read. Check that it is a valid CSV or Excel file.") from exc
+    for grid in sheets.values():
+        if any(any(value not in (None, "") for value in row) for row in grid):
+            return grid
+    raise ValueError("The uploaded spreadsheet contains no sheets or rows to query.")
+
+
+def inspect_upload(filename: str, contents: bytes) -> UploadInspection:
+    """Recognise Tally reports and title-row layouts; never writes to disk."""
+
+    grid = _first_grid(filename, contents)
+    report = tally_import.parse_tally_report(grid)
+    if report is not None:
+        return UploadInspection(kind="tally", report=report)
+    if tally_import.looks_like_report_layout(grid):
+        return UploadInspection(
+            kind="unknown",
+            rows=tally_import.preview_rows(grid),
+            suggested_header_row=tally_import.suggest_header_row(grid),
+        )
+    return UploadInspection(kind="table")
+
+
+def tally_workspace_file(workspace: dict[str, Any]) -> Path:
+    """The SQLite file of an existing Tally workspace that new reports can extend."""
+
+    if workspace.get("source_type") != TALLY_SOURCE_TYPE:
+        raise ValueError("Only an imported Tally data source can take more Tally reports.")
+    source = workspace_source_file(workspace.get("database_uri"))
+    if source is None or not source.is_file() or not is_financial_report_file(source):
+        raise ValueError("This Tally data source is no longer available. Upload it again.")
+    return source
+
+
+def create_tally_workspace(
+    name: str, report: tally_import.TallyReport, *, storage_dir: Path | None = None
+) -> tuple[Workspace, tally_import.SaveResult]:
+    if not name or not name.strip():
+        raise ValueError("Workspace name is required.")
+    destination = storage_dir or LOCAL_WORKSPACE_DIRECTORY
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(prefix="pucho_tally_", suffix=".db", dir=destination, delete=False) as handle:
+        sqlite_path = Path(handle.name)
+    try:
+        result = tally_import.save_report(report, sqlite_path)
+        tally_import.write_metadata(report_metadata_path(sqlite_path), report, result)
+        workspace = create_sqlite_workspace(name, str(sqlite_path))
+    except (sqlite3.Error, OSError, ValueError) as exc:
+        sqlite_path.unlink(missing_ok=True)
+        report_metadata_path(sqlite_path).unlink(missing_ok=True)
+        raise ValueError("The Tally report could not be saved as a query workspace.") from exc
+    return replace(workspace, source_type=TALLY_SOURCE_TYPE), result
+
+
+def extend_tally_workspace(
+    workspace: dict[str, Any], report: tally_import.TallyReport
+) -> tally_import.SaveResult:
+    source = tally_workspace_file(workspace)
+    try:
+        result = tally_import.save_report(report, source)
+        tally_import.write_metadata(report_metadata_path(source), report, result)
+    except (sqlite3.Error, OSError) as exc:
+        raise ValueError("The Tally report could not be added to this data source.") from exc
+    return result
+
+
+def tally_overlap(workspace: dict[str, Any], report: tally_import.TallyReport) -> dict[str, Any]:
+    """Preview facts about adding a report to an existing Tally source."""
+
+    source = tally_workspace_file(workspace)
+    metadata = tally_import.read_metadata(report_metadata_path(source))
+    companies = tally_import.companies_in(metadata)
+    duplicates = tally_import.existing_voucher_overlap(report, source)
+    return {
+        "existing_vouchers": duplicates,
+        "new_rows": max(0, len(report.rows) - duplicates) if report.report_type == tally_import.VOUCHER_REGISTER else len(report.rows),
+        "different_company": bool(companies and report.metadata.company_name and report.metadata.company_name not in companies),
+    }
+
+
+def _numeric_column(values: list[object]) -> bool:
+    present = [value for value in values if value not in (None, "")]
+    return bool(present) and all(tally_import.parse_amount(value) is not None for value in present)
+
+
+def create_header_row_workspace(
+    name: str, filename: str, contents: bytes, header_row: int, *, storage_dir: Path | None = None
+) -> Workspace:
+    """Import a title-row spreadsheet using the header row the user picked."""
+
+    if not name or not name.strip():
+        raise ValueError("Workspace name is required.")
+    grid = _first_grid(filename, contents)
+    names, rows = tally_import.table_from_header_row(grid, header_row)
+    columns = _unique_column_names(names)
+    cleaned: list[list[object]] = [[] for _ in rows]
+    for index in range(len(columns)):
+        values = [row[index] for row in rows]
+        numeric = _numeric_column(values)
+        for position, value in enumerate(values):
+            if numeric:
+                amount = tally_import.parse_amount(value)
+                cleaned[position].append(None if amount is None else float(amount))
+            elif hasattr(value, "isoformat"):
+                cleaned[position].append(value.isoformat())
+            else:
+                cleaned[position].append(None if value in (None, "") else str(value).strip())
+    frame = pd.DataFrame(cleaned, columns=columns)
+    destination = storage_dir or LOCAL_WORKSPACE_DIRECTORY
+    destination.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(prefix="pucho_import_", suffix=".db", dir=destination, delete=False) as handle:
+        sqlite_path = Path(handle.name)
+    try:
+        connection = sqlite3.connect(sqlite_path)
+        try:
+            frame.to_sql(_unique_table_name(Path(filename).stem, set()), connection, if_exists="fail", index=False)
+            connection.commit()
+        finally:
+            connection.close()
+        workspace = create_sqlite_workspace(name, str(sqlite_path))
+    except (sqlite3.Error, ValueError) as exc:
+        sqlite_path.unlink(missing_ok=True)
+        raise ValueError("The spreadsheet could not be converted into a query workspace.") from exc
+    return replace(workspace, source_type="spreadsheet")
+
+
 def _connection_value_error(exc: ValidationError) -> ValueError:
     error = exc.errors()[0]
     message = str(error.get("msg", "Check the connection details and try again."))
@@ -404,6 +557,15 @@ def _unique_column_names(columns: list[object]) -> list[str]:
     return result
 
 
+def _sqlite_file(database_uri: str) -> Path | None:
+    if not database_uri.startswith("sqlite:///"):
+        return None
+    raw = database_uri[len("sqlite:///"):].split("?", 1)[0]
+    if not raw or raw == ":memory:" or raw.startswith("file:"):
+        return None
+    return Path(raw)
+
+
 def _open_engine(database_uri: str, connect_args: dict | None = None):
     return create_database_engine(database_uri, connect_args=connect_args)
 
@@ -416,12 +578,21 @@ def get_schema_snapshot(database_uri: str, *, connect_args: dict | None = None) 
         lines: list[str] = []
         column_tables: dict[str, list[str]] = {}
         categorical_suffixes = ("status", "type", "category", "method")
-        connection = engine.connect() if database_uri.startswith("sqlite") else None
+        # Categorical hints read real cell values, so they are limited to local
+        # files, can be switched off, and are never read from imported
+        # financial reports (Tally exports carry party names and amounts).
+        report_source = is_financial_report_file(_sqlite_file(database_uri))
+        hints_allowed = database_uri.startswith("sqlite") and schema_value_hints_enabled() and not report_source
+        connection = engine.connect() if hints_allowed else None
         preparer = engine.dialect.identifier_preparer
         for table in inspector.get_table_names():
             columns = inspector.get_columns(table)
             fields = ", ".join(f"{column['name']} ({column['type']})" for column in columns)
             table_lines = [f"Table: {table}", f"Columns: {fields}"]
+            if report_source:
+                note = tally_import.schema_note(str(table))
+                if note:
+                    table_lines.append(f"Notes: {note}")
             for column in columns:
                 column_name = str(column["name"])
                 column_tables.setdefault(column_name, []).append(table)
@@ -432,7 +603,7 @@ def get_schema_snapshot(database_uri: str, *, connect_args: dict | None = None) 
                         f"SELECT DISTINCT {quoted_column} FROM {quoted_table} "
                         f"WHERE {quoted_column} IS NOT NULL LIMIT 13"
                     )).scalars().all()
-                    if 0 < len(values) <= 12:
+                    if 0 < len(values) <= 12 and all(safe_value_hint(value) for value in values):
                         table_lines.append(
                             f"Values for {column_name}: " + ", ".join(repr(str(value)) for value in values)
                         )

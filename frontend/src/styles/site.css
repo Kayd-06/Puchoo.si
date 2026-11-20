@@ -1780,6 +1780,9 @@
 }
 .auth-form-content {
   padding-block: clamp(0.75rem, 2vh, 1.5rem);
+  /* Auto margins centre the form while it fits and fall back to top alignment
+     when it is taller than the panel, so the heading can always be scrolled to. */
+  margin-block: auto;
 }
 .auth-shell-dense .auth-form-content {
   max-width: 42rem;

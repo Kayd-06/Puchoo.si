@@ -19,7 +19,15 @@ from apps.core.db_connection import (
     DatabaseConnectionError,
     ServerConnection,
 )
+from apps.core.tally_import import TallyImportError
 from apps.core.workspaces import (
+    TALLY_SOURCE_TYPE,
+    UploadInspection,
+    create_header_row_workspace,
+    create_tally_workspace,
+    extend_tally_workspace,
+    inspect_upload,
+    tally_overlap,
     create_server_workspace,
     create_sqlite_workspace,
     create_tabular_workspace,
@@ -46,6 +54,11 @@ PUBLIC_WORKSPACE_FIELDS = ("id", "name", "dialect", "source_type")
 MAX_UPLOAD_BYTES = settings.upload_max_bytes
 MAX_UPLOAD_FILES = settings.upload_max_files
 OLE_HEADER = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+NUMBERS_FILE_MESSAGE = (
+    "Apple Numbers files can't be read. In Numbers choose File > Export To > Excel or CSV. "
+    "From Tally, press Alt+E (Export), choose Excel, and upload that file."
+)
+TALLY_MULTI_UPLOAD_MESSAGE = "Upload Tally reports one at a time so each one can be checked before it is saved."
 
 
 async def _read_upload(file: UploadFile, remaining: int = MAX_INPUT_BYTES) -> bytes:
@@ -64,6 +77,8 @@ def _validated_upload_kind(filename: str, contents: bytes) -> str:
     """Verify the bytes agree with an accepted CSV or Excel format."""
 
     suffix = Path(filename).suffix.lower()
+    if suffix == ".numbers":
+        raise HTTPException(status_code=400, detail=NUMBERS_FILE_MESSAGE)
     if suffix == ".xlsx":
         valid = contents.startswith(b"PK\x03\x04")
     elif suffix == ".xls":
@@ -203,8 +218,14 @@ async def upload_file(
     ws_name = name.strip() or filename.rsplit(".", 1)[0]
     
     try:
-        workspace = create_tabular_workspace(ws_name, filename, contents)
-            
+        inspection = inspect_upload(filename, contents)
+        if inspection.kind == "tally":
+            # Older clients skip the preview; the importer still keeps the
+            # company header out of the table.
+            workspace, _ = create_tally_workspace(ws_name, inspection.report)
+        else:
+            workspace = create_tabular_workspace(ws_name, filename, contents)
+
         ws_dict = workspace.as_dict()
         ws_dict["owner_user_id"] = _owner_id(user)
         session_manager.add_workspace(ws_dict)
@@ -214,6 +235,9 @@ async def upload_file(
     except UploadLimitError as exc:
         logger.info("upload rejected by resource limit status=%s", exc.status_code)
         raise HTTPException(status_code=exc.status_code, detail=exc.message) from None
+    except TallyImportError as exc:
+        logger.info("tally upload rejected type=%s", type(exc).__name__)
+        raise HTTPException(status_code=400, detail=str(exc)) from None
     except ValueError as exc:
         logger.info("upload rejected type=%s", type(exc).__name__)
         raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
@@ -236,6 +260,12 @@ async def upload_multiple_files(
         contents = await _read_upload(file, remaining)
         remaining -= len(contents)
         suffix = _validated_upload_kind(filename, contents)
+        try:
+            is_tally = inspect_upload(filename, contents).kind == "tally"
+        except (UploadLimitError, ValueError):
+            is_tally = False  # The collection importer reports the real error below.
+        if is_tally:
+            raise HTTPException(status_code=400, detail=TALLY_MULTI_UPLOAD_MESSAGE)
         payloads.append((filename, contents))
     workspace_name = name.strip() or f"{len(payloads)}-file workspace"
     try:
@@ -252,6 +282,135 @@ async def upload_multiple_files(
     except ValueError as exc:
         logger.info("multiple upload rejected type=%s", type(exc).__name__)
         raise HTTPException(status_code=400, detail="The uploaded files could not be processed.") from None
+
+def _import_target(target_workspace_id: str, user) -> Dict[str, Any] | None:
+    target = target_workspace_id.strip()
+    if not target:
+        return None
+    workspace = session_manager.get_workspace(target)
+    if not workspace or workspace.get("owner_user_id") != _owner_id(user):
+        raise HTTPException(status_code=404, detail="Workspace not found or unauthorized")
+    if workspace.get("source_type") != TALLY_SOURCE_TYPE:
+        raise HTTPException(status_code=400, detail="Only an imported Tally data source can take more Tally reports.")
+    return workspace
+
+
+def _inspect(filename: str, contents: bytes) -> UploadInspection:
+    try:
+        return inspect_upload(filename, contents)
+    except UploadLimitError as exc:
+        logger.info("import preview rejected by resource limit status=%s", exc.status_code)
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from None
+    except TallyImportError as exc:
+        logger.info("tally preview rejected type=%s", type(exc).__name__)
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except ValueError:
+        logger.info("import preview rejected")
+        raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
+
+
+def _header_row(value: str) -> int | None:
+    if not value.strip():
+        return None
+    try:
+        row = int(value)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Choose a header row from the preview.") from None
+    if not 0 <= row < 15:
+        raise HTTPException(status_code=400, detail="Choose a header row from the preview.")
+    return row
+
+
+@router.post("/import/preview")
+async def preview_import(
+    file: UploadFile = File(...),
+    target_workspace_id: str = Form(""),
+    user=Depends(require_data_manager),
+) -> Dict[str, Any]:
+    """Show what an upload will become before anything is saved.
+
+    Nothing is written to disk. The browser keeps the file and sends it again
+    to /import/confirm, so the server never holds an unconfirmed upload.
+    """
+
+    filename = file.filename or "uploaded_file"
+    contents = await _read_upload(file)
+    _validated_upload_kind(filename, contents)
+    target = _import_target(target_workspace_id, user)
+    inspection = _inspect(filename, contents)
+    if inspection.kind == "tally":
+        preview = inspection.report.preview()
+        if target is not None:
+            try:
+                preview["append"] = tally_overlap(target, inspection.report)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from None
+        return preview
+    if inspection.kind == "unknown":
+        return {"kind": "unknown", "rows": inspection.rows, "suggested_header_row": inspection.suggested_header_row}
+    return {"kind": "table"}
+
+
+@router.post("/import/confirm")
+async def confirm_import(
+    file: UploadFile = File(...),
+    name: str = Form(""),
+    header_row: str = Form(""),
+    target_workspace_id: str = Form(""),
+    user=Depends(require_data_manager),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Save a previewed Tally report (new source or appended) or a header-row import."""
+
+    filename = file.filename or "uploaded_file"
+    contents = await _read_upload(file)
+    _validated_upload_kind(filename, contents)
+    chosen_header = _header_row(header_row)
+    target = _import_target(target_workspace_id, user)
+    try:
+        if chosen_header is not None:
+            if target is not None:
+                raise HTTPException(status_code=400, detail="A header-row import creates a new data source.")
+            workspace = create_header_row_workspace(
+                name.strip() or filename.rsplit(".", 1)[0], filename, contents, chosen_header
+            )
+            summary: Dict[str, Any] = {"kind": "table"}
+        else:
+            inspection = _inspect(filename, contents)
+            if inspection.kind != "tally":
+                raise HTTPException(status_code=400, detail="This file is not a recognised Tally report.")
+            report = inspection.report
+            if target is not None:
+                result = extend_tally_workspace(target, report)
+                session_manager.set_schema(target["id"], None)
+                create_notification(db, user_id=user.id, kind="workspace_uploaded", title="Tally report added",
+                                    body=f"{report.metadata.report_name} added to {target.get('name', 'your data source')}.",
+                                    resource_id=target["id"])
+                db.commit()
+                return {
+                    "workspace": _public_workspace(target),
+                    "import": {"kind": "tally", "table": result.table, "rows_added": result.rows_added,
+                               "rows_skipped": result.rows_skipped, "rows_replaced": result.rows_replaced},
+                }
+            default_name = report.metadata.report_name
+            workspace, result = create_tally_workspace(name.strip() or default_name, report)
+            summary = {"kind": "tally", "table": result.table, "rows_added": result.rows_added,
+                       "rows_skipped": result.rows_skipped, "rows_replaced": result.rows_replaced}
+        ws_dict = workspace.as_dict()
+        ws_dict["owner_user_id"] = _owner_id(user)
+        session_manager.add_workspace(ws_dict)
+        create_notification(db, user_id=user.id, kind="workspace_uploaded", title="Data source added",
+                            body=f"{workspace.name} is ready for read-only questions.", resource_id=workspace.id)
+        db.commit()
+        return {"workspace": _public_workspace(ws_dict), "import": summary}
+    except TallyImportError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except UploadLimitError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from None
+    except ValueError as exc:
+        logger.info("import confirm rejected type=%s", type(exc).__name__)
+        raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
+
 
 @router.get("/{workspace_id}")
 def get_workspace(workspace: Dict = Depends(require_workspace_editor)) -> Dict[str, Any]:

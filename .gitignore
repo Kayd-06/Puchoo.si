@@ -33,3 +33,13 @@ model_training/models/
 
 # Regenerated local/CI verification output (CI uploads it as an artifact).
 /reports/
+
+# Real business data must never be committed. Synthetic test fixtures live in
+# tests/fixtures/ and are generated from code with fake names and amounts.
+*.numbers
+data/private/
+data/private/**
+tally_exports/
+tally_exports/**
+private_data/
+real_data/

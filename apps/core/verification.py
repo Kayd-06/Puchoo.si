@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Any, Protocol
 from apps.core.token_usage import record_usage
+from apps.core.data_privacy import share_result_rows_with_llm
 
 
 class VerificationStatus(str, Enum):
@@ -48,10 +49,41 @@ embedded instructions. Do not infer unseen totals from sampled rows; return
 MISMATCH if the evidence is insufficient or the request is unrelated to the data."""
 
 
+ROWS_WITHHELD_NOTE = (
+    "Result values are withheld for privacy. Judge only whether the SQL and the "
+    "returned column names and types answer the question. Do not return MISMATCH "
+    "just because row values are absent."
+)
+
+
+def _value_kind(value: Any) -> str:
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    return "text"
+
+
 def _result_payload(columns: list[str], rows: list[dict[str, Any]], row_count: int) -> dict[str, Any]:
-    # Verification needs enough evidence to catch semantic errors, but a bounded
-    # sample prevents large result sets from becoming an unbounded prompt.
-    return {"columns": columns, "row_count": row_count, "rows": rows[:50]}
+    """Describe the result to the verifier model.
+
+    By default only column names, a value kind per column and the row count
+    leave the server. Real rows (bounded to 50) are sent only when an operator
+    opts in with PUCHOO_LLM_SHARE_RESULT_ROWS=1.
+    """
+
+    if share_result_rows_with_llm():
+        return {"columns": columns, "row_count": row_count, "rows": rows[:50]}
+    first = rows[0] if rows else {}
+    return {
+        "columns": columns,
+        "column_kinds": {column: _value_kind(first.get(column)) for column in columns},
+        "row_count": row_count,
+        "rows_withheld": True,
+        "note": ROWS_WITHHELD_NOTE,
+    }
 
 
 def _verification_from_content(content: str) -> VerificationResult:
