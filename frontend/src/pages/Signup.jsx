@@ -157,7 +157,7 @@ export default function Signup() {
                   key={value}
                   className={`flex min-h-28 flex-col items-start gap-2 rounded-2xl border px-3 py-3 text-sm ${values.workspace_type === value ? 'border-[#111827] bg-[#eef3fc]' : 'border-black/10'} ${focusRing}`}
                 >
-                  <span className="flex items-center gap-2 font-medium">
+                  <span className="flex items-center gap-2 font-medium text-[#111827]">
                     <input
                       type="radio"
                       name="workspace_type"

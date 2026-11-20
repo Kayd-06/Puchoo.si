@@ -30,7 +30,7 @@ export default function AuthShell({ title, subtitle, children, footer, dense = f
           </p>
         </div>
       </section>
-      <section className="auth-form-panel flex items-center bg-[#edf1f9] px-6 py-12 md:px-14">
+      <section className="auth-form-panel flex items-start bg-[#edf1f9] px-6 py-12 md:px-14">
         <div className="auth-form-content mx-auto w-full max-w-md">
           <h2 className="text-[36px] font-medium tracking-[-0.045em] text-[#0c1830]">{title}</h2>
           <p className="mt-2 text-[16px] leading-relaxed text-[#60708d]">{subtitle}</p>
