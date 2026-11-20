@@ -88,15 +88,14 @@ class ApprovedConversationMemory:
         question = _compact_text(record.get("question"))
         interpreted = _compact_text(record.get("interpreted_request"))
         planning_question = _compact_text(record.get("processing_question"))
-        verification = record.get("verification") if isinstance(record.get("verification"), dict) else {}
-        verification_summary = _compact_text(verification.get("summary"), 1_000)
+        # The verifier's summary can quote result values, and memory is later
+        # sent to the model as retrieved context, so it is not stored.
         document = "\n".join(
             item
             for item in (
                 f"Question: {question}" if question else "",
                 f"Interpretation: {interpreted}" if interpreted else "",
                 f"Planning question: {planning_question}" if planning_question else "",
-                f"Verification: {verification_summary}" if verification_summary else "",
             )
             if item
         )

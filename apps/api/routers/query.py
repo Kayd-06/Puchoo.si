@@ -66,6 +66,7 @@ from apps.core.clarifications import resolve_clarifications
 from backend.routers.auth import current_user
 from backend.database import get_db
 from backend.notifications import create_notification
+from apps.core.data_privacy import translate_result_values
 
 router = APIRouter(prefix="/query", tags=["query"])
 logger = logging.getLogger(__name__)
@@ -90,6 +91,12 @@ def utc_now() -> str:
 
 def _redact_sql(sql: str) -> str:
     return re.sub(r"'(?:''|[^'])*'|\"(?:\"\"|[^\"])*\"", "?", sql)
+
+
+def clear_translation_cache() -> None:
+    """Drop cached translations, which can hold text derived from deleted data."""
+
+    _translation_cache.clear()
 
 
 def _log_trace(trace: dict[str, Any]) -> None:
@@ -213,7 +220,9 @@ def _localize_rows(
     one call per value); anything still missing stays in English and is recorded.
     """
 
-    if not language_code:
+    if not language_code or not translate_result_values():
+        # Cell text (party names, item names) stays on the server unless the
+        # operator opts in with PUCHOO_TRANSLATE_RESULT_VALUES=1.
         return rows
     texts = list(dict.fromkeys(
         value.strip()
@@ -472,10 +481,10 @@ def generate_query(
                     attempt = max_attempts + 1
                 if guarded is None or feedback:
                     logger.warning(
-                        "query_generation_rejected route=%s attempts=%s feedback=%s sql=%s",
+                        "query_generation_rejected route=%s attempts=%s feedback_count=%s sql=%s",
                         decision.route,
                         attempt,
-                        feedback,
+                        len(feedback),
                         _redact_sql(generated_sql),
                     )
                     raise SQLGenerationError(
@@ -809,7 +818,11 @@ def approve_pending_query(
             # A translation outage must not hide a valid answer: fall back to English.
             return _translate_for_display(text, output_language, failures=translation_failures)
 
-        headline = localize(presentation.headline)
+        if presentation.headline_label is not None and presentation.headline_value is not None:
+            # Translate the label only; the result value never goes to the translator.
+            headline = f"{localize(presentation.headline_label)}: {presentation.headline_value}"
+        else:
+            headline = localize(presentation.headline)
         detail = localize(presentation.detail)
         highlights = [
             (localize(label), value)

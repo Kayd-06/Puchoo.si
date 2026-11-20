@@ -19,6 +19,12 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from apps.core.guardrails import SchemaCatalog
 from apps.core.upload_limits import MAX_INPUT_BYTES, UploadLimitError, UploadLimits, read_tabular
+from apps.core.data_privacy import (
+    is_financial_report_file,
+    report_metadata_path,
+    safe_value_hint,
+    schema_value_hints_enabled,
+)
 
 from apps.core.db_connection import (
     GENERIC_CONNECTION_ERROR,
@@ -111,7 +117,8 @@ def delete_workspace_files(database_uri: object, *, root: Path | None = None) ->
     if source is None:
         return []
     removed: list[Path] = []
-    for path in (source, *(source.with_name(source.name + suffix) for suffix in ("-wal", "-shm", "-journal"))):
+    companions = (source.with_name(source.name + suffix) for suffix in ("-wal", "-shm", "-journal"))
+    for path in (source, *companions, report_metadata_path(source)):
         try:
             if path.is_symlink() or not path.is_file():
                 continue
@@ -404,6 +411,15 @@ def _unique_column_names(columns: list[object]) -> list[str]:
     return result
 
 
+def _sqlite_file(database_uri: str) -> Path | None:
+    if not database_uri.startswith("sqlite:///"):
+        return None
+    raw = database_uri[len("sqlite:///"):].split("?", 1)[0]
+    if not raw or raw == ":memory:" or raw.startswith("file:"):
+        return None
+    return Path(raw)
+
+
 def _open_engine(database_uri: str, connect_args: dict | None = None):
     return create_database_engine(database_uri, connect_args=connect_args)
 
@@ -416,7 +432,15 @@ def get_schema_snapshot(database_uri: str, *, connect_args: dict | None = None) 
         lines: list[str] = []
         column_tables: dict[str, list[str]] = {}
         categorical_suffixes = ("status", "type", "category", "method")
-        connection = engine.connect() if database_uri.startswith("sqlite") else None
+        # Categorical hints read real cell values, so they are limited to local
+        # files, can be switched off, and are never read from imported
+        # financial reports (Tally exports carry party names and amounts).
+        hints_allowed = (
+            database_uri.startswith("sqlite")
+            and schema_value_hints_enabled()
+            and not is_financial_report_file(_sqlite_file(database_uri))
+        )
+        connection = engine.connect() if hints_allowed else None
         preparer = engine.dialect.identifier_preparer
         for table in inspector.get_table_names():
             columns = inspector.get_columns(table)
@@ -432,7 +456,7 @@ def get_schema_snapshot(database_uri: str, *, connect_args: dict | None = None) 
                         f"SELECT DISTINCT {quoted_column} FROM {quoted_table} "
                         f"WHERE {quoted_column} IS NOT NULL LIMIT 13"
                     )).scalars().all()
-                    if 0 < len(values) <= 12:
+                    if 0 < len(values) <= 12 and all(safe_value_hint(value) for value in values):
                         table_lines.append(
                             f"Values for {column_name}: " + ", ".join(repr(str(value)) for value in values)
                         )
