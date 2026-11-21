@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from apps.core.local_state import load_local_state
+from backend.source_blobs import restore_source
 from backend.models import (
     Tenant,
     TenantMembership,
@@ -37,6 +38,15 @@ def _local_source_ref(workspace: dict[str, Any]) -> str | None:
     if database_uri.startswith("sqlite:///"):
         return str(Path(database_uri.removeprefix("sqlite:///")).expanduser().resolve())
     return None
+
+
+def _source_is_on_disk(source_ref: str | None) -> bool:
+    if not source_ref:
+        return False
+    try:
+        return Path(source_ref).expanduser().resolve().is_file()
+    except (OSError, RuntimeError):
+        return False
 
 
 def _history_entry_id(payload: dict[str, Any], seen: set[str]) -> str:
@@ -76,7 +86,7 @@ class WorkspaceRepository:
         records = self.db.scalars(
             select(WorkspaceRecord).where(WorkspaceRecord.tenant_id == tenant_id).order_by(WorkspaceRecord.created_at)
         ).all()
-        return [self._as_dict(record) for record in records]
+        return [self.resolve(record) for record in records]
 
     def get_for_tenant(self, workspace_id: str, tenant_id: str) -> dict[str, Any] | None:
         record = self.db.scalar(
@@ -85,7 +95,18 @@ class WorkspaceRepository:
                 WorkspaceRecord.tenant_id == tenant_id,
             )
         )
-        return self._as_dict(record) if record else None
+        return self.resolve(record) if record else None
+
+    def resolve(self, record: WorkspaceRecord) -> dict[str, Any]:
+        """Like ``_as_dict``, but first restores a wiped upload from its durable copy.
+
+        The caller commits if it wants a moved ``source_ref`` saved; the file
+        itself is already back on disk either way.
+        """
+
+        if record.source_type != "server" and not _source_is_on_disk(record.source_ref):
+            restore_source(self.db, record)
+        return self._as_dict(record)
 
     def save_workspace(self, workspace: dict[str, Any], tenant_id: str) -> dict[str, Any]:
         record = self.db.get(WorkspaceRecord, str(workspace["id"]))

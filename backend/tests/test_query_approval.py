@@ -296,7 +296,8 @@ def test_generate_returns_actionable_error_when_workspace_source_is_unavailable(
 
     assert response.status_code == 409
     assert response.json()["detail"] == (
-        "This data source is unavailable. Reconnect or upload it again before asking a question."
+        "This data source needs to be uploaded again. Its file is no longer on the server, "
+        "so re-upload it (or reconnect it) before asking a question."
     )
 
 
@@ -591,7 +592,7 @@ def test_migration_creates_pending_queries_table(tmp_path):
         with database.engine.connect() as connection:
             tables = {row[0] for row in connection.execute(text("SELECT name FROM sqlite_master WHERE type = 'table'"))}
             assert "pending_queries" in tables
-            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261107_0017"
+            assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261121_0018"
     finally:
         database.configure_database(original_url)
 

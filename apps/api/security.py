@@ -47,6 +47,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
             
         return response
 
+SOURCE_UNAVAILABLE_MESSAGE = (
+    "This data source needs to be uploaded again. Its file is no longer on the server, "
+    "so re-upload it (or reconnect it) before asking a question."
+)
+
+
 def tenant_owner_id(user) -> str:
     """Canonical tenant boundary for every workspace, query, and memory record."""
     return tenant_id_for(user)
@@ -103,10 +109,13 @@ def require_workspace_editor(
     workspace: dict = Depends(get_workspace_guard),
     user=Depends(require_capability("query_workspace")),
 ):
+    from apps.api.session import session_manager
+    # A restart can wipe an uploaded file; put it back from its database copy.
+    workspace = session_manager.ensure_source_on_disk(workspace["id"], workspace["owner_user_id"]) or workspace
     if workspace.get("availability") == "unavailable" or not workspace.get("database_uri"):
         raise HTTPException(
             status_code=409,
-            detail="This data source is unavailable. Reconnect or upload it again before asking a question.",
+            detail=SOURCE_UNAVAILABLE_MESSAGE,
         )
     return workspace
 
