@@ -7,6 +7,7 @@ cannot redefine registered business metrics or silently broaden the schema.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from typing import Iterable
@@ -181,6 +182,88 @@ def select_relevant_schema(schema: str, plan: QueryPlan) -> str:
     return "\n\n".join(blocks) if blocks else schema
 
 
+_FOCUS_STOPWORDS = {
+    "the", "and", "for", "with", "from", "what", "which", "show", "list", "give", "total", "all",
+    "how", "many", "much", "per", "each", "this", "that", "was", "were", "are", "is", "of", "in",
+    "on", "by", "to", "me", "my", "our", "a", "an", "vs", "versus", "compare", "between", "data",
+}
+
+
+def _focus_int(name: str, default: int, lower: int, upper: int) -> int:
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        value = default
+    return max(lower, min(value, upper))
+
+
+def _stem(word: str) -> str:
+    word = word.lower()
+    if len(word) > 4 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 4 and word.endswith(("ses", "xes", "ches", "shes")):
+        return word[:-2]
+    if len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
+        return word[:-1]
+    return word
+
+
+def _identifier_words(value: str) -> set[str]:
+    return {_stem(part) for part in re.split(r"[^a-z0-9]+", value.lower()) if len(part) > 1}
+
+
+def focus_schema_for_question(
+    schema: str, question: str, *, focus_after: int | None = None, max_tables: int | None = None
+) -> tuple[str, list[str]]:
+    """Keep only the tables a question is about when a source has many tables.
+
+    Deterministic and local: question words are matched against table names
+    (strong signal) and column names that are not shared by most tables (weak
+    signal). A source with few tables, or a question that matches nothing,
+    keeps the whole schema. Returns the schema text and the chosen table
+    names (empty when nothing was dropped).
+    """
+
+    tables = parse_schema(schema)
+    focus_after = _focus_int("PUCHOO_SCHEMA_FOCUS_AFTER_TABLES", 5, 1, 200) if focus_after is None else focus_after
+    max_tables = _focus_int("PUCHOO_SCHEMA_FOCUS_MAX_TABLES", 6, 1, 50) if max_tables is None else max_tables
+    if len(tables) <= focus_after:
+        return schema, []
+    words = {_stem(word) for word in re.findall(r"[a-z][a-z0-9]+", question.lower())} - _FOCUS_STOPWORDS
+    if not words:
+        return schema, []
+    column_words = [set().union(*(_identifier_words(column) for column in table.columns)) for table in tables]
+    shared = {
+        word for word in set().union(*column_words)
+        if sum(word in item for item in column_words) * 2 > len(tables)
+    }
+    scored: list[tuple[int, int, TableDefinition]] = []
+    for position, (table, columns) in enumerate(zip(tables, column_words)):
+        score = 3 * len(words & _identifier_words(table.name)) + len(words & (columns - shared))
+        if score:
+            scored.append((score, -position, table))
+    if not scored:
+        return schema, []
+    scored.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    chosen = {table.name for _, _, table in scored[:max_tables]}
+    if len(chosen) >= len(tables):
+        return schema, []
+    selected = [table for table in tables if table.name in chosen]
+    blocks = [table.block for table in selected]
+    key_tables: dict[str, list[str]] = {}
+    for table in selected:
+        for column in table.columns:
+            if column.endswith("_id"):
+                key_tables.setdefault(column, []).append(table.name)
+    hints = [
+        f"{column}: " + ", ".join(f"{name}.{column}" for name in names)
+        for column, names in key_tables.items() if len(names) > 1
+    ]
+    if hints:
+        blocks.append("Join candidates (same key name; use only when relevant):\n" + "\n".join(hints))
+    return "\n\n".join(blocks), [table.name for table in selected]
+
+
 def render_planned_question(plan: QueryPlan) -> str:
     payload = json.dumps(plan.as_dict(), ensure_ascii=False, separators=(",", ":"))
     return (
@@ -220,6 +303,7 @@ __all__ = [
     "QueryPlan",
     "TableDefinition",
     "build_query_plan",
+    "focus_schema_for_question",
     "parse_schema",
     "plan_semantic_feedback",
     "render_planned_question",

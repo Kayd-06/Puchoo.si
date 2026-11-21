@@ -6,8 +6,13 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { can } from '../auth/capabilities';
-import TallyImportPreview from '../components/connect/TallyImportPreview';
+import TallyImportPreview, { TABLE_NAME_HINT } from '../components/connect/TallyImportPreview';
 import HeaderRowPicker from '../components/connect/HeaderRowPicker';
+import CompanyPicker, {
+  NEW_COMPANY,
+  companyOptions,
+  defaultCompanyTarget,
+} from '../components/connect/CompanyPicker';
 
 const ACCEPTED_FILES = '.csv,.xlsx';
 export const NUMBERS_FILE_MESSAGE =
@@ -35,7 +40,13 @@ function fileLabel(file) {
 }
 
 export default function ConnectData() {
-  const { addWorkspace, setActiveWorkspaceId, workspaces = [] } = useAppContext();
+  const {
+    addWorkspace,
+    updateWorkspace,
+    setActiveWorkspaceId,
+    activeWorkspaceId,
+    workspaces = [],
+  } = useAppContext();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upload');
   const [selectedFiles, setSelectedFiles] = useState([]);
@@ -46,8 +57,13 @@ export default function ConnectData() {
   const [createdWorkspace, setCreatedWorkspace] = useState(null);
   const [importSummary, setImportSummary] = useState(null);
   const [tallyPreview, setTallyPreview] = useState(null);
-  const [tallyTarget, setTallyTarget] = useState('');
+  const [companyTarget, setCompanyTarget] = useState(null);
+  const [tableChoice, setTableChoice] = useState(null);
+  const [appendInfo, setAppendInfo] = useState(null);
+  const [mismatchConfirmed, setMismatchConfirmed] = useState(false);
   const [headerPicker, setHeaderPicker] = useState(null);
+  const [plainTableName, setPlainTableName] = useState('');
+  const [addedToCompany, setAddedToCompany] = useState(false);
   const [serverForm, setServerForm] = useState({
     name: '',
     engine: 'postgresql',
@@ -89,16 +105,23 @@ export default function ConnectData() {
     );
   }
 
-  // A wiped source with no stored copy can't take more reports until it is re-uploaded.
-  const tallySources = workspaces.filter(
-    (workspace) =>
-      workspace.source_type === 'tally_report' && workspace.availability !== 'unavailable',
-  );
+  // A wiped source with no stored copy can't take more files until it is re-uploaded.
+  const companies = companyOptions(workspaces);
+  const target =
+    companyTarget &&
+    (companyTarget === NEW_COMPANY || companies.some((c) => c.id === companyTarget))
+      ? companyTarget
+      : defaultCompanyTarget(companies, activeWorkspaceId);
+  const targetCompany = companies.find((company) => company.id === target) || null;
+  const targetId = targetCompany ? targetCompany.id : '';
 
   const resetImport = () => {
     setTallyPreview(null);
-    setTallyTarget('');
     setHeaderPicker(null);
+    setTableChoice(null);
+    setAppendInfo(null);
+    setMismatchConfirmed(false);
+    setPlainTableName('');
   };
 
   const selectFiles = (files) => {
@@ -120,36 +143,73 @@ export default function ConnectData() {
     resetImport();
   };
 
-  const finishImport = (workspace, summary = null) => {
-    addWorkspace(workspace);
+  const finishImport = (workspace, summary = null, existing = false) => {
+    if (existing) updateWorkspace(workspace);
+    else addWorkspace(workspace);
     setActiveWorkspaceId(workspace.id);
     setCreatedWorkspace(workspace);
     setImportSummary(summary);
+    setAddedToCompany(existing);
     setSelectedFiles([]);
     setWorkspaceName('');
     resetImport();
   };
 
-  const previewTally = async (file, targetId) => {
+  const previewTally = async (file, previewTargetId) => {
     const preview = await fetchApi('/workspaces/import/preview', {
       method: 'POST',
-      body: importForm(file, { target_workspace_id: targetId }),
+      body: importForm(file, { target_workspace_id: previewTargetId }),
     });
     return preview;
   };
 
-  const changeTallyTarget = async (targetId) => {
+  const showTallyPreview = (file, preview) => {
+    setTallyPreview({ file, data: preview });
+    setTableChoice({
+      mode: preview.company?.suggested_mode || 'new',
+      table: preview.company?.suggested_table || preview.table,
+      label: '',
+    });
+    setAppendInfo(null);
+    setMismatchConfirmed(false);
+    if (!workspaceName.trim() && preview.company_name) setWorkspaceName(preview.company_name);
+  };
+
+  const changeTallyTarget = async (nextTarget) => {
     if (!tallyPreview) return;
-    setTallyTarget(targetId);
+    setCompanyTarget(nextTarget);
     setUploading(true);
     setUploadError('');
     try {
-      const preview = await previewTally(tallyPreview.file, targetId);
-      setTallyPreview({ file: tallyPreview.file, data: preview });
+      const preview = await previewTally(
+        tallyPreview.file,
+        nextTarget === NEW_COMPANY ? '' : nextTarget,
+      );
+      showTallyPreview(tallyPreview.file, preview);
     } catch (error) {
       setUploadError(error.message || 'Could not check this report against the saved data.');
     } finally {
       setUploading(false);
+    }
+  };
+
+  const changeTableChoice = async (next) => {
+    setTableChoice(next);
+    if (!tallyPreview || !targetId || next.mode !== 'append' || !next.table) {
+      setAppendInfo(null);
+      return;
+    }
+    try {
+      const info = await fetchApi('/workspaces/import/append-check', {
+        method: 'POST',
+        body: importForm(tallyPreview.file, {
+          target_workspace_id: targetId,
+          table_name: next.table,
+        }),
+      });
+      setAppendInfo(info);
+    } catch {
+      setAppendInfo(null);
     }
   };
 
@@ -161,15 +221,30 @@ export default function ConnectData() {
     try {
       const result = await fetchApi('/workspaces/import/confirm', {
         method: 'POST',
-        body: importForm(file, { name: workspaceName.trim(), ...fields }),
+        body: importForm(file, {
+          ...(targetId ? { target_workspace_id: targetId } : { name: workspaceName.trim() }),
+          ...fields,
+        }),
       });
-      finishImport(result.workspace, result.import);
+      finishImport(result.workspace, result.import, Boolean(result.added_to_existing));
     } catch (error) {
-      setUploadError(error.message || 'Import failed');
+      setUploadError(
+        error.code === 'company_mismatch'
+          ? `${error.message} Tick the check box above to add it anyway.`
+          : error.message || 'Import failed',
+      );
     } finally {
       setUploading(false);
     }
   };
+
+  const confirmTally = () =>
+    confirmImport({
+      mode: tableChoice?.mode || '',
+      table_name: tableChoice?.table || '',
+      label: tableChoice?.mode === 'new' ? tableChoice?.label || '' : '',
+      confirm_company_mismatch: mismatchConfirmed ? 'true' : '',
+    });
 
   const uploadFiles = async () => {
     if (!selectedFiles.length) return;
@@ -185,9 +260,9 @@ export default function ConnectData() {
         // A single file is checked first: Tally reports and title-row layouts
         // get a preview before anything is saved.
         const [file] = selectedFiles;
-        const preview = await previewTally(file, '');
+        const preview = await previewTally(file, targetId);
         if (preview.kind === 'tally') {
-          setTallyPreview({ file, data: preview });
+          showTallyPreview(file, preview);
           return;
         }
         if (preview.kind === 'unknown') {
@@ -196,18 +271,20 @@ export default function ConnectData() {
             rows: preview.rows,
             selectedRow: preview.suggested_header_row || 0,
           });
+          setPlainTableName(preview.company?.suggested_table || '');
           return;
         }
       }
       const form = new FormData();
       const multiple = selectedFiles.length > 1;
       selectedFiles.forEach((file) => form.append(multiple ? 'files' : 'file', file));
-      form.append('name', workspaceName.trim());
+      if (targetId) form.append('target_workspace_id', targetId);
+      else form.append('name', workspaceName.trim());
       const workspace = await fetchApi(
         multiple ? '/workspaces/upload-multiple' : '/workspaces/upload',
         { method: 'POST', body: form },
       );
-      finishImport(workspace);
+      finishImport(workspace, null, Boolean(targetId));
     } catch (error) {
       setUploadError(error.message || 'Upload failed');
     } finally {
@@ -338,9 +415,17 @@ export default function ConnectData() {
                 <div>
                   <Check size={22} />
                 </div>
-                <span>Workspace ready</span>
+                <span>{addedToCompany ? 'File added' : 'Company ready'}</span>
                 <h1>{createdWorkspace.name}</h1>
-                <p>Your source is now isolated and available for verified, read-only analysis.</p>
+                <p>
+                  {addedToCompany
+                    ? `The file is now part of ${createdWorkspace.name}${
+                        typeof createdWorkspace.file_count === 'number'
+                          ? `, which has ${createdWorkspace.file_count} file${createdWorkspace.file_count === 1 ? '' : 's'}`
+                          : ''
+                      }. Ask questions across all of them.`
+                    : 'Your source is now isolated and available for verified, read-only analysis.'}
+                </p>
                 {importSummary?.kind === 'tally' && (
                   <p className="connect-import-summary">
                     {importSummary.rows_added} row{importSummary.rows_added === 1 ? '' : 's'} added
@@ -357,7 +442,7 @@ export default function ConnectData() {
                   Ask your data <ArrowUpRight size={17} />
                 </Link>
                 <button type="button" onClick={() => setCreatedWorkspace(null)}>
-                  Add another source
+                  Add another file
                 </button>
               </div>
             ) : activeTab === 'upload' ? (
@@ -365,7 +450,8 @@ export default function ConnectData() {
                 <h1>Upload your data</h1>
                 <p>Upload CSV or Excel files, up to 20 at once.</p>
                 <p className="connect-upload-note">
-                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported.
+                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported. Add
+                  every file of one company to the same company, one file at a time.
                 </p>
                 <input
                   id="fileUpload"
@@ -399,7 +485,7 @@ export default function ConnectData() {
                   </div>
                   <strong>
                     {uploading
-                      ? 'Creating isolated workspace…'
+                      ? 'Checking your file…'
                       : selectedFiles.length
                         ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
                         : 'Drop files here'}
@@ -415,26 +501,52 @@ export default function ConnectData() {
                   <TallyImportPreview
                     preview={tallyPreview.data}
                     fileName={tallyPreview.file.name}
-                    tallySources={tallySources}
-                    targetId={tallyTarget}
+                    companies={companies}
+                    targetId={target}
                     onTargetChange={changeTallyTarget}
-                    onConfirm={() => confirmImport({ target_workspace_id: tallyTarget })}
+                    newCompanyName={workspaceName}
+                    onNewCompanyNameChange={setWorkspaceName}
+                    choice={tableChoice}
+                    onChoiceChange={changeTableChoice}
+                    appendInfo={appendInfo}
+                    mismatchConfirmed={mismatchConfirmed}
+                    onMismatchConfirmedChange={setMismatchConfirmed}
+                    onConfirm={confirmTally}
                     onCancel={resetImport}
                     busy={uploading}
                   />
                 )}
                 {headerPicker && (
-                  <HeaderRowPicker
-                    fileName={headerPicker.file.name}
-                    rows={headerPicker.rows}
-                    selectedRow={headerPicker.selectedRow}
-                    onSelect={(row) =>
-                      setHeaderPicker((current) => ({ ...current, selectedRow: row }))
-                    }
-                    onConfirm={() => confirmImport({ header_row: headerPicker.selectedRow })}
-                    onCancel={resetImport}
-                    busy={uploading}
-                  />
+                  <>
+                    {targetId && (
+                      <label className="connect-table-name" htmlFor="header-table-name">
+                        <span>Table name in {targetCompany?.name}</span>
+                        <input
+                          id="header-table-name"
+                          value={plainTableName}
+                          maxLength={63}
+                          onChange={(event) => setPlainTableName(event.target.value)}
+                        />
+                        <small>{TABLE_NAME_HINT}</small>
+                      </label>
+                    )}
+                    <HeaderRowPicker
+                      fileName={headerPicker.file.name}
+                      rows={headerPicker.rows}
+                      selectedRow={headerPicker.selectedRow}
+                      onSelect={(row) =>
+                        setHeaderPicker((current) => ({ ...current, selectedRow: row }))
+                      }
+                      onConfirm={() =>
+                        confirmImport({
+                          header_row: headerPicker.selectedRow,
+                          table_name: targetId ? plainTableName.trim() : '',
+                        })
+                      }
+                      onCancel={resetImport}
+                      busy={uploading}
+                    />
+                  </>
                 )}
                 {selectedFiles.length > 0 && !uploading && !tallyPreview && !headerPicker && (
                   <div className="connect-selected-files">
@@ -455,14 +567,17 @@ export default function ConnectData() {
                         </span>
                       ))}
                     </div>
-                    <input
-                      value={workspaceName}
-                      onChange={(event) => setWorkspaceName(event.target.value)}
-                      placeholder="Name this workspace (optional)"
-                      aria-label="Workspace name"
+                    <CompanyPicker
+                      idPrefix="upload-company"
+                      companies={companies}
+                      value={target}
+                      onChange={setCompanyTarget}
+                      newName={workspaceName}
+                      onNewNameChange={setWorkspaceName}
                     />
                     <button type="button" className="connect-submit" onClick={uploadFiles}>
-                      Create workspace <ArrowUpRight size={17} />
+                      {targetCompany ? `Add to ${targetCompany.name}` : 'Create company'}{' '}
+                      <ArrowUpRight size={17} />
                     </button>
                   </div>
                 )}

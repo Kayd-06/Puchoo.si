@@ -131,6 +131,8 @@ Foreign-tenant workspace resources return 404; insufficient same-tenant permissi
 
 Upload **CSV or XLSX** files, or connect a supported PostgreSQL/MySQL server. XLS and arbitrary SQLite database uploads are unsupported; export those tables as CSV/XLSX first. Only owners/admins can upload or manage sources. Tabular imports produce managed private SQLite datasets.
 
+Uploads are grouped by **company**. A company is one data source with one table per file, so a single question can use the sales register, ledgers and stock list together. When you upload, pick an existing company or "+ New company". Uploading the same Tally report for a new period adds rows to its table (duplicate vouchers are skipped); a different report becomes a new table. If the report header names a different company, you are asked to confirm first. Settings lists the files in the active company (rows, period, date added) and lets owners and admins replace or remove one file, or move another uploaded source into the company.
+
 | Setting                              | Default / hard ceiling                                                |
 | ------------------------------------ | --------------------------------------------------------------------- |
 | `UPLOAD_MAX_FILES`                   | 10 files per request                                                  |

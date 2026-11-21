@@ -1,5 +1,6 @@
 import { AlertTriangle, Check, FileSpreadsheet, X } from 'lucide-react';
 import '../../styles/tallyImport.css';
+import CompanyPicker, { NEW_COMPANY } from './CompanyPicker';
 
 const REPORT_LABELS = {
   voucher_register: 'Voucher register',
@@ -46,12 +47,34 @@ export function totalsSummary(totals) {
 
 const HIDDEN_PREVIEW_COLUMNS = new Set(['period_start', 'period_end', 'source_report', 'line_no']);
 
+export const TABLE_NAME_HINT =
+  'Table names are sent to the AI with your questions, so keep company or party names out of them.';
+
+function AppendNote({ info }) {
+  if (!info) return null;
+  return (
+    <p className="tally-preview-append" role="note">
+      {info.existing_vouchers > 0
+        ? `${info.existing_vouchers} voucher${info.existing_vouchers === 1 ? ' is' : 's are'} already saved and will be skipped. `
+        : ''}
+      {info.new_rows} new row{info.new_rows === 1 ? '' : 's'} will be added.
+    </p>
+  );
+}
+
 export default function TallyImportPreview({
   preview,
   fileName,
-  tallySources = [],
-  targetId = '',
+  companies = [],
+  targetId = NEW_COMPANY,
   onTargetChange,
+  newCompanyName = '',
+  onNewCompanyNameChange,
+  choice = null,
+  onChoiceChange,
+  appendInfo = null,
+  mismatchConfirmed = false,
+  onMismatchConfirmedChange,
   onConfirm,
   onCancel,
   busy = false,
@@ -59,7 +82,16 @@ export default function TallyImportPreview({
   const columns = preview.columns.filter((column) => !HIDDEN_PREVIEW_COLUMNS.has(column));
   const status = preview.totals_check?.status || 'unavailable';
   const failedChecks = (preview.totals_check?.checks || []).filter((check) => !check.ok);
-  const append = preview.append;
+  const company = preview.company || {};
+  const existing = targetId && targetId !== NEW_COMPANY;
+  const targetName = companies.find((item) => item.id === targetId)?.name || 'this company';
+  const candidates = existing ? company.append_candidates || [] : [];
+  const mode = choice?.mode || company.suggested_mode || 'new';
+  const tableName = choice?.table ?? company.suggested_table ?? preview.table;
+  const mismatch = existing && company.different_company;
+  const update = (patch) =>
+    onChoiceChange?.({ mode, table: tableName, label: choice?.label || '', ...patch });
+  const blocked = busy || (mismatch && !mismatchConfirmed) || !String(tableName || '').trim();
   return (
     <section className="tally-preview" aria-labelledby="tally-preview-title">
       <header className="tally-preview-header">
@@ -86,7 +118,7 @@ export default function TallyImportPreview({
         <div>
           <dt>Table</dt>
           <dd>
-            <code>{preview.table}</code>
+            <code>{mode === 'append' ? tableName : tableName || preview.table}</code>
           </dd>
         </div>
       </dl>
@@ -158,41 +190,115 @@ export default function TallyImportPreview({
         </table>
       </div>
 
-      {tallySources.length > 0 && (
-        <label className="tally-preview-target">
-          <span>Save to</span>
-          <select
-            value={targetId}
-            onChange={(event) => onTargetChange?.(event.target.value)}
-            disabled={busy}
-          >
-            <option value="">A new data source</option>
-            {tallySources.map((source) => (
-              <option key={source.id} value={source.id}>
-                Add to {source.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {append && (
-        <p className="tally-preview-append" role="note">
-          {append.existing_vouchers > 0
-            ? `${append.existing_vouchers} voucher${append.existing_vouchers === 1 ? ' is' : 's are'} already saved and will be skipped. `
-            : ''}
-          {append.new_rows} new row{append.new_rows === 1 ? '' : 's'} will be added.
-          {append.different_company
-            ? ' This report is from a different company than the saved data.'
-            : ''}
-        </p>
+      <fieldset className="tally-preview-destination" disabled={busy}>
+        <legend>Where this file goes</legend>
+        <CompanyPicker
+          idPrefix="tally-company"
+          companies={companies}
+          value={targetId}
+          onChange={onTargetChange}
+          newName={newCompanyName}
+          onNewNameChange={onNewCompanyNameChange}
+          newNamePlaceholder={preview.company_name || 'Company name'}
+        />
+        {candidates.length > 0 && (
+          <div className="tally-preview-modes" role="radiogroup" aria-label="Table">
+            <label>
+              <input
+                type="radio"
+                name="tally-mode"
+                checked={mode === 'append'}
+                onChange={() => update({ mode: 'append', table: candidates[0] })}
+              />
+              <span>Add rows to an existing table (same report, new period)</span>
+            </label>
+            <label>
+              <input
+                type="radio"
+                name="tally-mode"
+                checked={mode === 'new'}
+                onChange={() =>
+                  update({
+                    mode: 'new',
+                    table:
+                      company.suggested_mode === 'new' ? company.suggested_table : preview.table,
+                  })
+                }
+              />
+              <span>Save as a new table</span>
+            </label>
+          </div>
+        )}
+        {mode === 'append' && candidates.length > 0 ? (
+          <label className="tally-preview-field" htmlFor="tally-append-table">
+            <span>Existing table</span>
+            <select
+              id="tally-append-table"
+              value={tableName}
+              onChange={(event) => update({ table: event.target.value })}
+            >
+              {candidates.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <>
+            <label className="tally-preview-field" htmlFor="tally-table-name">
+              <span>Table name</span>
+              <input
+                id="tally-table-name"
+                value={tableName}
+                maxLength={63}
+                onChange={(event) => update({ table: event.target.value })}
+              />
+            </label>
+            <label className="tally-preview-field" htmlFor="tally-file-label">
+              <span>Name in the files list (optional)</span>
+              <input
+                id="tally-file-label"
+                value={choice?.label || ''}
+                maxLength={120}
+                placeholder={preview.report_name}
+                onChange={(event) => update({ label: event.target.value })}
+              />
+            </label>
+            <p className="tally-preview-hint">{TABLE_NAME_HINT}</p>
+          </>
+        )}
+      </fieldset>
+      {existing && mode === 'append' && <AppendNote info={appendInfo || preview.append} />}
+
+      {mismatch && (
+        <div className="tally-preview-mismatch" role="alert">
+          <AlertTriangle size={16} />
+          <div>
+            <strong>This report looks like it is from a different company.</strong>
+            <p>
+              The report header says {preview.company_name || 'another company'}, but {targetName}{' '}
+              holds reports from {company.company_on_file || 'another company'}.
+            </p>
+            <label>
+              <input
+                type="checkbox"
+                checked={mismatchConfirmed}
+                onChange={(event) => onMismatchConfirmedChange?.(event.target.checked)}
+              />
+              <span>I checked this. Add it to {targetName} anyway.</span>
+            </label>
+          </div>
+        </div>
       )}
 
       <div className="tally-preview-actions">
         <button type="button" className="tally-preview-cancel" onClick={onCancel} disabled={busy}>
           <X size={15} /> Cancel
         </button>
-        <button type="button" className="connect-submit" onClick={onConfirm} disabled={busy}>
-          <Check size={15} /> {busy ? 'Saving…' : 'Confirm and save'}
+        <button type="button" className="connect-submit" onClick={onConfirm} disabled={blocked}>
+          <Check size={15} />{' '}
+          {busy ? 'Saving…' : existing ? `Add to ${targetName}` : 'Create company and save'}
         </button>
       </div>
     </section>

@@ -1,0 +1,172 @@
+/* Files inside a company (Settings) and the Move into company action. */
+#root .app-container .settings-page .company-files-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 15px;
+  border-color: var(--settings-line);
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .company-files-panel h2 {
+  margin: 4px 0;
+  font: 500 16px/1.25 var(--font-sans);
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+#root .app-container .settings-page .company-files-panel h3 {
+  margin: 4px 0;
+  font: 500 14px/1.3 var(--font-sans);
+}
+#root .app-container .settings-page .company-files-panel .settings-section-kicker {
+  font: 500 9px/1.4 var(--font-sans);
+  color: var(--settings-muted);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+#root .app-container .settings-page .company-files-panel p {
+  margin: 0;
+  font: 400 11px/1.55 var(--font-sans);
+  color: var(--settings-muted);
+}
+.company-file-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+#root .app-container .settings-page .company-file {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--settings-line);
+  border-radius: 12px;
+  background: var(--settings-card);
+}
+#root .app-container .settings-page .company-file-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--settings-tint);
+  color: var(--settings-accent);
+}
+#root .app-container .settings-page .company-file-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+#root .app-container .settings-page .company-file-copy strong {
+  font: 500 13px/1.3 var(--font-sans);
+  overflow-wrap: anywhere;
+}
+#root .app-container .settings-page .company-file-copy span,
+#root .app-container .settings-page .company-file-copy code {
+  color: var(--settings-muted);
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+#root .app-container .settings-page .company-file-facts {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--settings-line);
+}
+#root .app-container .settings-page .company-file-facts dt {
+  color: var(--settings-muted);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+#root .app-container .settings-page .company-file-facts dd {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .company-file-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 6px;
+}
+#root .app-container .settings-page .company-file-actions .settings-action,
+#root .app-container .settings-page .company-file-remove,
+#root .app-container .settings-page .company-files-warning .settings-action,
+#root .app-container .settings-page .company-merge-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+#root .app-container .settings-page .company-file-remove {
+  border: 1px solid color-mix(in srgb, var(--settings-danger) 35%, var(--settings-line));
+  background: var(--settings-danger-bg);
+  color: var(--settings-danger);
+  cursor: pointer;
+}
+#root .app-container .settings-page .company-file-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .company-files-warning {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, #f5b542 40%, var(--settings-line));
+  border-radius: 12px;
+}
+#root .app-container .settings-page .company-files-warning p {
+  flex: 1 1 260px;
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .company-files-error {
+  color: var(--settings-danger);
+}
+#root .app-container .settings-page .company-merge {
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--settings-line);
+}
+#root .app-container .settings-page .company-merge label {
+  display: grid;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--settings-muted);
+}
+#root .app-container .settings-page .company-merge select {
+  min-height: 38px;
+  padding: 8px 10px;
+  border: 1px solid var(--settings-line);
+  border-radius: 9px;
+  background: var(--settings-card);
+  color: var(--settings-text);
+  font: 400 12px var(--font-sans);
+}
+#root .app-container .settings-page .company-merge label.company-merge-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--settings-text);
+}
+#root .app-container .settings-page .company-merge-button {
+  justify-self: start;
+}

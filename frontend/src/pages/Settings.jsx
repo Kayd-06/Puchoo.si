@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import AccountProfile from '../components/AccountProfile';
 import OrganizationDeletePanel from '../components/workspace/OrganizationDeletePanel';
 import DeleteDataSourcePanel from '../components/workspace/DeleteDataSourcePanel';
+import CompanyFilesPanel from '../components/workspace/CompanyFilesPanel';
 import WorkspaceInvitePanel from '../components/workspace/WorkspaceInvitePanel';
 import { can } from '../auth/capabilities';
 
@@ -50,6 +51,9 @@ export default function Settings() {
               Manage history <span aria-hidden="true">↗</span>
             </button>
           </section>
+          {can(user, 'query_workspace') && (
+            <CompanyFilesPanel key={`company-files-${activeWorkspace?.id || 'none'}`} />
+          )}
           {user?.role === 'owner' && <DeleteDataSourcePanel />}
           {user?.role === 'owner' && (
             <OrganizationDeletePanel key={activeWorkspace?.id || 'no-source'} />

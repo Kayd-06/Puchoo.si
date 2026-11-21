@@ -175,12 +175,15 @@ def test_appending_months_and_reuploading_does_not_double_count(client):
     assert _ask(client, workspace_id, "total sales in November") == [{"total_sales": pytest.approx(float(fx.NOVEMBER_TOTAL))}]
 
 
-def test_only_tally_sources_can_be_extended(client):
+def test_any_uploaded_company_can_take_a_tally_report(client):
     plain = client.post(
         "/api/workspaces/upload", files=_files("plain.csv", b"month,revenue\nJan,1\n"), headers=csrf_headers(client)
     ).json()
     response = _confirm(client, "Sales Register.xlsx", fx.sales_register_xlsx(), target_workspace_id=plain["id"])
-    assert response.status_code == 400
+    assert response.status_code == 200, response.text
+    assert response.json()["workspace"]["id"] == plain["id"]
+    tables = [table["name"] for table in client.get(f"/api/workspaces/{plain['id']}/tables").json()]
+    assert tables == ["plain", "sales_register"]
     assert _confirm(client, "s.xlsx", fx.sales_register_xlsx(), target_workspace_id="ws_missing").status_code == 404
 
 

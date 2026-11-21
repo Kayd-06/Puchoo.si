@@ -91,31 +91,95 @@ describe('Tally import preview', () => {
     expect(screen.getByRole('status')).toHaveTextContent('1 total do not match Tally');
     expect(screen.getByText(/rows 4,76,000.00, Tally 4,76,100.00/)).toBeInTheDocument();
     expect(screen.getByText('Suspense A/c is present.')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /Confirm and save/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Create company and save/ }));
     fireEvent.click(screen.getByRole('button', { name: /Cancel/ }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
     expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
-  it('offers existing Tally sources and explains skipped duplicates', () => {
+  it('adds to an existing company and explains skipped duplicates', () => {
     const onTargetChange = vi.fn();
+    const onChoiceChange = vi.fn();
+    const onConfirm = vi.fn();
     render(
       <TallyImportPreview
         preview={{
           ...salesPreview,
+          company: {
+            tables: ['sales_register'],
+            append_candidates: ['sales_register'],
+            suggested_mode: 'append',
+            suggested_table: 'sales_register',
+            different_company: false,
+          },
           append: { existing_vouchers: 12, new_rows: 0, different_company: false },
         }}
         fileName="s.xlsx"
-        tallySources={[{ id: 'ws_1', name: 'Demo sales' }]}
+        companies={[{ id: 'ws_1', name: 'Demo Traders', file_count: 2 }]}
         targetId="ws_1"
         onTargetChange={onTargetChange}
+        onChoiceChange={onChoiceChange}
+        onConfirm={onConfirm}
       />,
     );
     expect(screen.getByRole('note')).toHaveTextContent(
       '12 vouchers are already saved and will be skipped. 0 new rows will be added.',
     );
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: '' } });
-    expect(onTargetChange).toHaveBeenCalledWith('');
+    const picker = screen.getByRole('combobox', { name: 'Add to company' });
+    expect(screen.getByRole('option', { name: 'Demo Traders (2 files)' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '+ New company' })).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Existing table' })).toHaveValue('sales_register');
+    fireEvent.click(screen.getByRole('radio', { name: 'Save as a new table' }));
+    expect(onChoiceChange).toHaveBeenCalledWith(expect.objectContaining({ mode: 'new' }));
+    fireEvent.click(screen.getByRole('button', { name: /Add to Demo Traders/ }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    fireEvent.change(picker, { target: { value: '__new__' } });
+    expect(onTargetChange).toHaveBeenCalledWith('__new__');
+  });
+
+  it('blocks saving into a different company until the user confirms', () => {
+    const onMismatch = vi.fn();
+    const preview = {
+      ...salesPreview,
+      company_name: 'Other Agencies (26-27)',
+      company: {
+        tables: ['sales_register'],
+        append_candidates: [],
+        suggested_mode: 'new',
+        suggested_table: 'sales_register_2',
+        different_company: true,
+        company_on_file: 'Demo Traders',
+      },
+    };
+    const props = {
+      preview,
+      fileName: 's.xlsx',
+      companies: [{ id: 'ws_1', name: 'Demo Traders', file_count: 1 }],
+      targetId: 'ws_1',
+      onMismatchConfirmedChange: onMismatch,
+    };
+    const { rerender } = render(<TallyImportPreview {...props} />);
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The report header says Other Agencies (26-27), but Demo Traders holds reports from Demo Traders.',
+    );
+    expect(screen.getByRole('textbox', { name: 'Table name' })).toHaveValue('sales_register_2');
+    const save = screen.getByRole('button', { name: /Add to Demo Traders/ });
+    expect(save).toBeDisabled();
+    fireEvent.click(screen.getByRole('checkbox', { name: /Add it to Demo Traders anyway/ }));
+    expect(onMismatch).toHaveBeenCalledWith(true);
+    rerender(<TallyImportPreview {...props} mismatchConfirmed />);
+    expect(screen.getByRole('button', { name: /Add to Demo Traders/ })).toBeEnabled();
+  });
+
+  it('needs a table name before saving', () => {
+    render(
+      <TallyImportPreview
+        preview={salesPreview}
+        fileName="s.xlsx"
+        choice={{ mode: 'new', table: '   ', label: '' }}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /Create company and save/ })).toBeDisabled();
   });
 
   it('formats dates and periods', () => {

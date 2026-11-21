@@ -19,8 +19,21 @@ stored, because memory is sent back to the model as context.
 
 Categorical hints read real values, so they are filtered: a value with a digit,
 an email, or more than 40 characters is dropped, and tables imported from
-financial reports (Tally) never get hints. `PUCHOO_SCHEMA_VALUE_HINTS=0` turns
+financial reports (Tally) never get hints. Once a company holds any Tally
+report, none of its tables get hints. `PUCHOO_SCHEMA_VALUE_HINTS=0` turns
 hints off everywhere.
+
+Table names are part of the schema, so they are sent with every question. A
+Tally report's table is named after the report type (for example
+`sales_register`), not after the file or the company. When you name a table
+yourself, keep company and party names out of it. The friendly file name you
+see in Settings, the original file name and the report header stay on the
+server.
+
+When a company has many tables (more than `PUCHOO_SCHEMA_FOCUS_AFTER_TABLES`,
+5 by default), only the tables that match the question are sent (at most
+`PUCHOO_SCHEMA_FOCUS_MAX_TABLES`, 6 by default). If nothing matches, every
+table is sent as before.
 
 ## Logs
 
@@ -38,8 +51,10 @@ Every log record is scrubbed when it is created, before any handler prints it:
 An upload is turned into a SQLite file on the server's disk. Render's free plan
 wipes that disk on every restart or redeploy, so the app also keeps a
 compressed (zlib) copy of that SQLite file in the app database (the
-`workspace_source_blobs` table in Neon Postgres). For a Tally report the small
-report metadata file is kept with it. When the file is missing on disk, the app
+`workspace_source_blobs` table in Neon Postgres). The small metadata file next
+to it (the list of files in a company, their labels and periods, and any Tally
+report headers) is kept with it. The copy is refreshed every time a file is
+added, replaced or removed, and when another source is moved into the company. When the file is missing on disk, the app
 writes it back from this copy before answering. A copy can only be restored for
 the same source and the same organization it was saved for. The copy is never
 sent to any outside service, and its contents are never logged (only the
@@ -53,6 +68,22 @@ name, history and settings.
 
 Database backups (`backend/backups.py`) include these copies, because they are
 part of the database.
+
+## Companies with many files
+
+A company is one data source with one table per file. Adding a file to a
+company, replacing one file or removing one file changes that company's SQLite
+file in a temporary copy first; the live file is swapped only when the change
+succeeded, so a failed upload leaves the company as it was. Removing or
+replacing a file also clears pending queries and cached schema and translations
+for that company. Only owners and admins can add, replace, remove or move
+files; editors can see the files list.
+
+"Move into company" copies every table of another uploaded source in the same
+organization into this company, then deletes the old source the same way as
+"Deleting an upload" below (stored file, sidecar, database copy, pending
+queries, cached translations and its conversation memory). Its question
+history is moved to the company. Database (server) connections cannot be moved.
 
 ## Deleting an upload
 
