@@ -196,14 +196,16 @@ def test_old_upload_endpoint_also_routes_tally_files_through_the_importer(client
     assert [table["name"] for table in tables] == ["sales_register"]
 
 
-def test_tally_reports_must_be_uploaded_one_at_a_time(client):
+def test_old_multi_upload_points_tally_reports_to_the_preview(client):
     response = client.post(
         "/api/workspaces/upload-multiple",
         files=[("files", ("a.csv", b"x,y\n1,2\n", "text/csv")), ("files", ("bs.csv", fx.balance_sheet_csv(), "text/csv"))],
         headers=csrf_headers(client),
     )
     assert response.status_code == 400
-    assert "one at a time" in response.json()["detail"]
+    detail = response.json()["detail"]
+    assert "one at a time" not in detail
+    assert "preview for each one" in detail
 
 
 def test_unknown_layout_returns_rows_and_imports_with_the_chosen_header(client):
@@ -216,7 +218,12 @@ def test_unknown_layout_returns_rows_and_imports_with_the_chosen_header(client):
     assert confirmed.status_code == 200, confirmed.text
     schema = client.get(f"/api/workspaces/{confirmed.json()['workspace']['id']}/schema").json()["schema"]
     assert "Columns: item (TEXT), qty (REAL), value (REAL)" in schema
-    assert _preview(client, "plain.csv", b"month,revenue\nJan,1\n").json() == {"kind": "table"}
+    plain = _preview(client, "plain.csv", b"month,revenue\nJan,1\n").json()
+    assert plain["kind"] == "table"
+    assert plain["columns"] == ["month", "revenue"]
+    assert plain["row_count"] == 1
+    assert plain["sample_rows"] == [{"month": "Jan", "revenue": 1}]
+    assert plain["suggested_table"] == "plain"
     assert _confirm(client, "stock.csv", contents, header_row="99").status_code == 400
 
 

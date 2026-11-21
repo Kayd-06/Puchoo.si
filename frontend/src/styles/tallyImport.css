@@ -1,5 +1,7 @@
 /* Tally report preview and header-row picker on the Connect Data page. */
-.tally-preview {
+.tally-preview,
+.batch-import,
+.batch-results {
   --tp-surface: rgba(6, 8, 10, 0.86);
   --tp-raised: rgba(255, 255, 255, 0.045);
   --tp-line: rgba(215, 227, 237, 0.2);
@@ -13,6 +15,9 @@
   --tp-warn-bg: rgba(245, 181, 66, 0.12);
   --tp-warn-fg: #f6d58e;
   --tp-select: rgba(180, 221, 251, 0.14);
+}
+
+.tally-preview {
   width: min(100%, 830px);
   margin: 26px auto 0;
   border: 1px solid var(--tp-line);
@@ -25,7 +30,7 @@
   pointer-events: auto;
 }
 
-html[data-theme='light'] #root .tally-preview {
+html[data-theme='light'] #root :is(.tally-preview, .batch-import, .batch-results) {
   --tp-surface: #f2f4f6;
   --tp-raised: #e8ebef;
   --tp-line: #cdd3db;

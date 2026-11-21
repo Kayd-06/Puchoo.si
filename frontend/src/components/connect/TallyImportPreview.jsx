@@ -62,43 +62,23 @@ function AppendNote({ info }) {
   );
 }
 
-export default function TallyImportPreview({
+/** The checked contents of one Tally report: type, period, rows, totals and first rows. */
+export function TallyReportBody({
   preview,
   fileName,
-  companies = [],
-  targetId = NEW_COMPANY,
-  onTargetChange,
-  newCompanyName = '',
-  onNewCompanyNameChange,
-  choice = null,
-  onChoiceChange,
-  appendInfo = null,
-  mismatchConfirmed = false,
-  onMismatchConfirmedChange,
-  onConfirm,
-  onCancel,
-  busy = false,
+  tableName,
+  headingId = 'tally-preview-title',
 }) {
   const columns = preview.columns.filter((column) => !HIDDEN_PREVIEW_COLUMNS.has(column));
   const status = preview.totals_check?.status || 'unavailable';
   const failedChecks = (preview.totals_check?.checks || []).filter((check) => !check.ok);
-  const company = preview.company || {};
-  const existing = targetId && targetId !== NEW_COMPANY;
-  const targetName = companies.find((item) => item.id === targetId)?.name || 'this company';
-  const candidates = existing ? company.append_candidates || [] : [];
-  const mode = choice?.mode || company.suggested_mode || 'new';
-  const tableName = choice?.table ?? company.suggested_table ?? preview.table;
-  const mismatch = existing && company.different_company;
-  const update = (patch) =>
-    onChoiceChange?.({ mode, table: tableName, label: choice?.label || '', ...patch });
-  const blocked = busy || (mismatch && !mismatchConfirmed) || !String(tableName || '').trim();
   return (
-    <section className="tally-preview" aria-labelledby="tally-preview-title">
+    <>
       <header className="tally-preview-header">
         <span className="tally-preview-badge">
           <FileSpreadsheet size={14} /> Tally report detected
         </span>
-        <h2 id="tally-preview-title">{preview.report_name}</h2>
+        <h2 id={headingId}>{preview.report_name}</h2>
         <p className="tally-preview-file">{fileName}</p>
       </header>
 
@@ -118,7 +98,7 @@ export default function TallyImportPreview({
         <div>
           <dt>Table</dt>
           <dd>
-            <code>{mode === 'append' ? tableName : tableName || preview.table}</code>
+            <code>{tableName || preview.table}</code>
           </dd>
         </div>
       </dl>
@@ -189,6 +169,44 @@ export default function TallyImportPreview({
           </tbody>
         </table>
       </div>
+    </>
+  );
+}
+
+export default function TallyImportPreview({
+  preview,
+  fileName,
+  companies = [],
+  targetId = NEW_COMPANY,
+  onTargetChange,
+  newCompanyName = '',
+  onNewCompanyNameChange,
+  choice = null,
+  onChoiceChange,
+  appendInfo = null,
+  mismatchConfirmed = false,
+  onMismatchConfirmedChange,
+  onConfirm,
+  onCancel,
+  busy = false,
+}) {
+  const company = preview.company || {};
+  const existing = targetId && targetId !== NEW_COMPANY;
+  const targetName = companies.find((item) => item.id === targetId)?.name || 'this company';
+  const candidates = existing ? company.append_candidates || [] : [];
+  const mode = choice?.mode || company.suggested_mode || 'new';
+  const tableName = choice?.table ?? company.suggested_table ?? preview.table;
+  const mismatch = existing && company.different_company;
+  const update = (patch) =>
+    onChoiceChange?.({ mode, table: tableName, label: choice?.label || '', ...patch });
+  const blocked = busy || (mismatch && !mismatchConfirmed) || !String(tableName || '').trim();
+  return (
+    <section className="tally-preview" aria-labelledby="tally-preview-title">
+      <TallyReportBody
+        preview={preview}
+        fileName={fileName}
+        tableName={mode === 'append' ? tableName : tableName || preview.table}
+      />
 
       <fieldset className="tally-preview-destination" disabled={busy}>
         <legend>Where this file goes</legend>

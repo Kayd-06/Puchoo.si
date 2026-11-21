@@ -66,6 +66,13 @@ then shows "Needs re-upload". A source wiped before this copy existed also
 shows "Needs re-upload"; uploading the file again keeps the same source, its
 name, history and settings.
 
+Re-upload replaces the whole SQLite file, so it only runs when that can't lose
+anything: the file is gone and there is no copy to restore, or the source has a
+single table. A company that still has several files is never re-uploaded (the
+server answers 409 `company_has_files`); add files to it, or replace one file
+in Settings. For a wiped company with no copy, re-upload one of its files to
+bring it back, then add the others from Data sources.
+
 Database backups (`backend/backups.py`) include these copies, because they are
 part of the database.
 
@@ -78,6 +85,17 @@ succeeded, so a failed upload leaves the company as it was. Removing or
 replacing a file also clears pending queries and cached schema and translations
 for that company. Only owners and admins can add, replace, remove or move
 files; editors can see the files list.
+
+Several files (up to 10) can be chosen at once. The browser keeps the files and
+sends each one to the preview, so every file gets the same size, type and role
+checks as a single upload and nothing is written before Save. On Save each kept
+file is sent on its own: the first one creates the company (or goes into the
+chosen one) and the rest are added to that company. Each file is its own
+atomic change, so one failing file is reported and the others are still saved,
+and the database copy is refreshed after every file. Adding files never deletes
+or replaces a table that is already there: the same Tally report for a new
+period adds rows (saved vouchers are skipped), ledgers and other reports get
+their own table, and a name that is already taken is refused for that file.
 
 "Move into company" copies every table of another uploaded source in the same
 organization into this company, then deletes the old source the same way as

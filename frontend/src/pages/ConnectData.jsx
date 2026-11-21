@@ -8,6 +8,10 @@ import { fetchApi } from '../api/client';
 import { can } from '../auth/capabilities';
 import TallyImportPreview, { TABLE_NAME_HINT } from '../components/connect/TallyImportPreview';
 import HeaderRowPicker from '../components/connect/HeaderRowPicker';
+import BatchImport, {
+  MAX_BATCH_FILES,
+  TOO_MANY_FILES_MESSAGE,
+} from '../components/connect/BatchImport';
 import CompanyPicker, {
   NEW_COMPANY,
   companyOptions,
@@ -64,6 +68,8 @@ export default function ConnectData() {
   const [headerPicker, setHeaderPicker] = useState(null);
   const [plainTableName, setPlainTableName] = useState('');
   const [addedToCompany, setAddedToCompany] = useState(false);
+  const [batchFiles, setBatchFiles] = useState(null);
+  const [addMoreTo, setAddMoreTo] = useState('');
   const [serverForm, setServerForm] = useState({
     name: '',
     engine: 'postgresql',
@@ -132,8 +138,25 @@ export default function ConnectData() {
       setUploadError(numbersError);
       return;
     }
-    if (incoming.length > 20 || incoming.some((file) => !/\.(csv|xlsx)$/i.test(file.name))) {
-      setUploadError('Choose up to 20 CSV or XLSX files.');
+    if (incoming.length > MAX_BATCH_FILES) {
+      setUploadError(
+        `${TOO_MANY_FILES_MESSAGE} You chose ${incoming.length}; pick ${MAX_BATCH_FILES} or fewer.`,
+      );
+      return;
+    }
+    if (incoming.some((file) => !/\.(csv|xlsx)$/i.test(file.name))) {
+      setUploadError('Choose CSV or XLSX files only.');
+      return;
+    }
+    setAddMoreTo('');
+    if (incoming.length > 1) {
+      // Several files: every file gets its own preview before anything is saved.
+      setSelectedFiles([]);
+      setUploadError('');
+      setCreatedWorkspace(null);
+      setImportSummary(null);
+      resetImport();
+      setBatchFiles(incoming);
       return;
     }
     setSelectedFiles(incoming);
@@ -292,6 +315,20 @@ export default function ConnectData() {
     }
   };
 
+  const batchSaved = (workspace, existing) => {
+    if (existing) updateWorkspace(workspace);
+    else addWorkspace(workspace);
+    setActiveWorkspaceId(workspace.id);
+  };
+
+  const addMoreFiles = (companyId) => {
+    setBatchFiles(null);
+    setCompanyTarget(companyId);
+    setAddMoreTo(companyId);
+    setSelectedFiles([]);
+    setUploadError('');
+  };
+
   const updateServerForm = (field, value) =>
     setServerForm((current) => ({ ...current, [field]: value }));
 
@@ -347,7 +384,7 @@ export default function ConnectData() {
   };
 
   return (
-    <div className="connect-page">
+    <div className={`connect-page${batchFiles && activeTab === 'upload' ? ' is-batch' : ''}`}>
       <section className="connect-stage">
         <header className="connect-stage-header">
           <span>Data sources</span>
@@ -410,7 +447,16 @@ export default function ConnectData() {
               </button>
             </div>
 
-            {createdWorkspace ? (
+            {batchFiles && activeTab === 'upload' ? (
+              <BatchImport
+                files={batchFiles}
+                companies={companies}
+                initialTarget={target}
+                onCompanySaved={batchSaved}
+                onClose={() => setBatchFiles(null)}
+                onAddMore={addMoreFiles}
+              />
+            ) : createdWorkspace ? (
               <div className="connect-complete" role="status">
                 <div>
                   <Check size={22} />
@@ -448,11 +494,19 @@ export default function ConnectData() {
             ) : activeTab === 'upload' ? (
               <div className="connect-upload-flow">
                 <h1>Upload your data</h1>
-                <p>Upload CSV or Excel files, up to 20 at once.</p>
+                <p>Upload CSV or Excel files, up to {MAX_BATCH_FILES} at once.</p>
                 <p className="connect-upload-note">
-                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported. Add
-                  every file of one company to the same company, one file at a time.
+                  Tally exports (XLSX or CSV) and plain spreadsheets are supported. Pick several
+                  files at once: each one gets a preview, you can cancel any of them, and the rest
+                  go into one company. Adding files never deletes what is already there.
                 </p>
+                {addMoreTo && targetCompany?.id === addMoreTo && (
+                  <p className="connect-upload-note" role="status">
+                    Choose more files for {targetCompany.name}. They are added next to the{' '}
+                    {targetCompany.file_count ? `${targetCompany.file_count} files` : 'files'}{' '}
+                    already there.
+                  </p>
+                )}
                 <input
                   id="fileUpload"
                   type="file"

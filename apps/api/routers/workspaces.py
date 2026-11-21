@@ -3,6 +3,8 @@
 import logging
 from pathlib import Path
 from typing import Any, Dict, List
+
+import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Response
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 from sqlalchemy.exc import SQLAlchemyError
@@ -61,6 +63,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 PUBLIC_WORKSPACE_FIELDS = ("id", "name", "dialect", "source_type", "availability")
 COMPANY_MISMATCH_CODE = "company_mismatch"
+COMPANY_HAS_FILES_CODE = "company_has_files"
 MAX_UPLOAD_BYTES = settings.upload_max_bytes
 MAX_UPLOAD_FILES = settings.upload_max_files
 OLE_HEADER = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -68,7 +71,16 @@ NUMBERS_FILE_MESSAGE = (
     "Apple Numbers files can't be read. In Numbers choose File > Export To > Excel or CSV. "
     "From Tally, press Alt+E (Export), choose Excel, and upload that file."
 )
-TALLY_MULTI_UPLOAD_MESSAGE = "Upload Tally reports one at a time so each one can be checked before it is saved."
+TALLY_MULTI_UPLOAD_MESSAGE = (
+    "Tally reports are checked before they are saved. Choose the files on Data sources to see a preview "
+    "for each one, then save them together."
+)
+
+
+def too_many_files_message(limit: int | None = None) -> str:
+    limit = MAX_UPLOAD_FILES if limit is None else limit
+    return f"You can upload up to {limit} files at once. Remove some files and try again."
+
 
 
 async def _read_upload(file: UploadFile, remaining: int = MAX_INPUT_BYTES) -> bytes:
@@ -335,7 +347,7 @@ async def upload_multiple_files(
     if not files:
         raise HTTPException(status_code=400, detail="Choose at least one CSV or Excel file")
     if len(files) > MAX_UPLOAD_FILES:
-        raise HTTPException(status_code=400, detail="Too many files were uploaded at once.")
+        raise HTTPException(status_code=400, detail=too_many_files_message())
     payloads: list[tuple[str, bytes]] = []
     remaining = MAX_INPUT_BYTES
     for file in files:
@@ -397,6 +409,54 @@ def _inspect(filename: str, contents: bytes) -> UploadInspection:
         raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
 
 
+PREVIEW_SAMPLE_ROWS = 5
+
+
+def _json_cell(value: Any) -> Any:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except (TypeError, ValueError):
+        pass
+    if hasattr(value, "item"):
+        value = value.item()
+    if isinstance(value, (int, float, str, bool)):
+        return value
+    return str(value)
+
+
+def _table_preview(frames: Dict[str, pd.DataFrame]) -> Dict[str, Any]:
+    """Columns, row count and the first rows of a plain file, for the browser only."""
+
+    sheets = [{"name": name, "rows": int(len(frame)), "columns": [str(c) for c in frame.columns]}
+              for name, frame in frames.items()]
+    first = next(iter(frames.values()))
+    columns = [str(column) for column in first.columns]
+    sample = [
+        {column: _json_cell(value) for column, value in zip(columns, row)}
+        for row in first.head(PREVIEW_SAMPLE_ROWS).itertuples(index=False, name=None)
+    ]
+    return {"columns": columns, "row_count": int(len(first)), "sample_rows": sample, "sheets": sheets}
+
+
+def _describe_tables(workspace: Dict[str, Any], summary: Dict[str, Any]) -> None:
+    """Add the saved table names and row counts to a plain-file import summary."""
+
+    try:
+        path = company_workspace_file(workspace)
+        counts = {item["table"]: item.get("rows") or 0 for item in company_files.list_files(path)}
+    except (CompanyFileError, OSError, ValueError):
+        return
+    tables = summary.get("tables") or list(counts)
+    if not tables:
+        return
+    summary["tables"] = tables
+    summary.setdefault("table", tables[0])
+    summary["rows"] = sum(int(counts.get(name, 0)) for name in tables)
+
+
 def _header_row(value: str) -> int | None:
     if not value.strip():
         return None
@@ -450,8 +510,16 @@ async def preview_import(
     company = {"tables": existing, "suggested_table": suggested_plain}
     if inspection.kind == "unknown":
         return {"kind": "unknown", "rows": inspection.rows, "suggested_header_row": inspection.suggested_header_row,
+                "suggested_table": suggested_plain,
                 **({"company": company} if target is not None else {})}
-    return {"kind": "table", **({"company": company} if target is not None else {})}
+    try:
+        frames = tabular_frames(filename, contents)
+    except UploadLimitError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
+    return {"kind": "table", "suggested_table": suggested_plain, **_table_preview(frames),
+            **({"company": company} if target is not None else {})}
 
 
 @router.post("/import/append-check")
@@ -497,7 +565,7 @@ async def confirm_import(
     contents = await _read_upload(file)
     _validated_upload_kind(filename, contents)
     chosen_header = _header_row(header_row)
-    if mode not in {"", company_files.APPEND, company_files.NEW}:
+    if mode not in {"", company_files.APPEND, company_files.NEW, company_files.AUTO}:
         raise HTTPException(status_code=400, detail="Choose whether to add rows to a table or create a new table.")
     target = _company_target(target_workspace_id, user)
     file_label = label.strip() or None
@@ -544,6 +612,8 @@ async def confirm_import(
                                 resource_id=target["id"])
             db.commit()
             current = session_manager.get_workspace(target["id"]) or target
+            if summary.get("kind") == "table":
+                _describe_tables(current, summary)
             return {"workspace": _public_workspace(current), "import": summary, "added_to_existing": True}
 
         company_name = name.strip()
@@ -576,6 +646,8 @@ async def confirm_import(
         create_notification(db, user_id=user.id, kind="workspace_uploaded", title="Data source added",
                             body=f"{workspace.name} is ready for read-only questions.", resource_id=workspace.id)
         db.commit()
+        if summary.get("kind") == "table":
+            _describe_tables(ws_dict, summary)
         return {"workspace": _public_workspace(ws_dict), "import": summary}
     except CompanyMismatchError as exc:
         raise _mismatch(exc) from None
@@ -609,6 +681,25 @@ async def reupload_source(
         raise HTTPException(status_code=404, detail="Workspace not found or unauthorized")
     if existing.get("source_type") == "server":
         raise HTTPException(status_code=400, detail="A database connection can't be re-uploaded. Delete it and connect it again.")
+    # Re-upload swaps the whole SQLite file. That is only safe when it can't
+    # destroy anything: the file is gone (no copy to restore), or the source
+    # holds a single table. A company with several files is never wiped here;
+    # files are added to it, or replaced one at a time in Settings.
+    current = session_manager.ensure_source_on_disk(workspace_id, tenant_id) or existing
+    if current.get("availability") != "unavailable":
+        try:
+            tables_now = company_files.count_tables(company_workspace_file(current)) or 0
+        except CompanyFileError:
+            tables_now = 0
+        if tables_now > 1:
+            raise HTTPException(status_code=409, detail={
+                "code": COMPANY_HAS_FILES_CODE,
+                "message": (
+                    f"{existing.get('name') or 'This company'} still has its {tables_now} files, so re-upload is "
+                    "turned off to keep them safe. Add more files from Data sources, or replace one file in "
+                    "Settings > Company files."
+                ),
+            })
     filename = file.filename or "uploaded_file"
     contents = await _read_upload(file)
     _validated_upload_kind(filename, contents)
@@ -620,7 +711,7 @@ async def reupload_source(
         else:
             inspection = inspect_upload(filename, contents)
             if inspection.kind == "tally":
-                replacement, _ = create_tally_workspace(name, inspection.report)
+                replacement, _ = create_tally_workspace(name, inspection.report, source_file=filename)
             elif existing.get("source_type") == TALLY_SOURCE_TYPE:
                 raise HTTPException(status_code=400, detail="This source was a Tally report. Upload the Tally export again.")
             else:

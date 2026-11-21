@@ -235,6 +235,53 @@ def register_xlsx(
     return buffer.getvalue()
 
 
+PURCHASES = [
+    (datetime(2026, 11, 3), "Demo Cement Works", "Purchase", "PU-11", None, "52000.00"),
+    (datetime(2026, 11, 8), "Sample Steel Traders", "Purchase", "PU-12", None, "31500.00"),
+    (datetime(2026, 11, 17), "Demo Tiles Factory", "Purchase", "PU-13", None, "18250.00"),
+]
+JOURNALS = [
+    (datetime(2026, 11, 30), "Depreciation", "Journal", "J-40", "4500.00", None),
+    (datetime(2026, 11, 30), "Office Equipment", "Journal", "J-40", None, "4500.00"),
+]
+STOCK_SUMMARY_CSV = (
+    b"Demo Traders stock summary,,\nPrinted 19-Nov-26,,\n,,\nItem,Qty,Value\n"
+    b"Cement,10,\"3,500.00\"\nSteel,4,\"12,000.00\"\n"
+)
+
+
+def plain_xlsx(rows: list[list[object]], sheet: str = "Sheet1") -> bytes:
+    """A plain spreadsheet with a header row and no report header."""
+
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = sheet
+    for row in rows:
+        worksheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def batch_files() -> list[tuple[str, bytes]]:
+    """Ten different fake files for one company: 7 Tally reports and 3 plain files."""
+
+    return [
+        ("Sales Register.xlsx", sales_register_xlsx()),
+        ("Bank Book.xlsx", register_xlsx("Ledger Vouchers", BANK_LEDGER)),
+        ("Expenses Ledger.xlsx", register_xlsx("Ledger Vouchers", EXPENSE_LEDGER)),
+        ("Receipt Register.xlsx", register_xlsx("Receipt Register", DEBTOR_RECEIPTS)),
+        ("Payment Register.xlsx", register_xlsx("Payment Register", CREDITOR_PAYMENTS)),
+        ("Purchase Register.xlsx", register_xlsx("Purchase Register", PURCHASES)),
+        ("Journal Register.xlsx", register_xlsx("Journal Register", JOURNALS)),
+        ("Balance Sheet.csv", balance_sheet_csv()),
+        ("Stock Summary.csv", STOCK_SUMMARY_CSV),
+        ("Sales Targets.xlsx", plain_xlsx([["month", "sales_target"], ["Nov", 400000], ["Dec", 450000]], "Targets")),
+    ]
+
+
 def main() -> None:
     (HERE / "sales_register_nov26.xlsx").write_bytes(sales_register_xlsx())
     (HERE / "sales_register_dec26.xlsx").write_bytes(

@@ -43,6 +43,9 @@ MAX_TABLE_NAME = 63
 MAX_LABEL = 120
 APPEND = "append"
 NEW = "new"
+# Batch uploads: same report appends, anything else becomes a new table.
+AUTO = "auto"
+LEDGER_TABLE = "ledger_vouchers"
 
 _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
@@ -419,7 +422,7 @@ def tally_choices(database_file: Path | None, report: tally_import.TallyReport) 
     # A second ledger is a different account, not a new month of the same one,
     # so ledgers start as their own table unless the user picks one.
     same_name = next((name for name in candidates if name.lower() == report.table.lower()), None)
-    append_default = same_name is not None and report.table != "ledger_vouchers"
+    append_default = same_name is not None and report.table != LEDGER_TABLE
     suggested_table = same_name if append_default else unique_table_name(report.table, tables)
     overlap = 0
     if append_default and report.report_type == tally_import.VOUCHER_REGISTER:
@@ -462,6 +465,24 @@ def resolve_tally_plan(
                 f"This company already has a table named {name}. Pick another name, or add the rows to that table."
             )
         return TallyPlan(NEW, name)
+    if mode == AUTO:
+        # Several files saved in one go: never ask, never overwrite. The same
+        # report (a new period) is appended with voucher dedupe; ledgers and
+        # different reports get their own table.
+        if requested:
+            name = safe_table_name(requested)
+            existing = by_lower.get(name.lower())
+            if existing is None:
+                return TallyPlan(NEW, name)
+            if existing in candidates and report.table != LEDGER_TABLE:
+                return TallyPlan(APPEND, existing)
+            raise CompanyFileError(
+                f"This company already has a table named {name}. Pick another name for this file."
+            )
+        same = by_lower.get(report.table.lower())
+        if same is not None and same in candidates and report.table != LEDGER_TABLE:
+            return TallyPlan(APPEND, same)
+        return TallyPlan(NEW, unique_table_name(report.table, tables))
     # Older clients send no mode: keep the old append behaviour for the same report.
     same = by_lower.get(report.table.lower())
     if same is not None and same in candidates:
