@@ -315,6 +315,115 @@ class SessionManager:
             db.commit()
         return result
 
+    def source_changed(self, workspace_id, tenant_id, *, drop_pending=False):
+        """A file was added to, removed from or replaced in a company.
+
+        Refreshes the durable copy in the same commit, then drops everything
+        derived from the old tables: the schema cache, any open proposal and
+        cached translations. ``drop_pending`` also removes stored proposals,
+        which can hold literals from data that was just removed.
+        Raises if the copy could not be saved so the caller can undo the file.
+        """
+        from sqlalchemy import delete
+        from backend.models import PendingQuery
+
+        workspace = self.get_workspace(workspace_id)
+        if not workspace or workspace.get("owner_user_id") != tenant_id:
+            raise ValueError("Workspace not found")
+        stored = {}
+
+        def action(db):
+            result = self._store_source_copy(db, workspace)
+            stored["durable"] = bool(result and result.stored)
+            if drop_pending:
+                db.execute(delete(PendingQuery).where(
+                    PendingQuery.workspace_id == workspace_id, PendingQuery.tenant_id == tenant_id))
+
+        with self._edit(workspace_id, action):
+            if workspace_id not in self.workspaces:
+                raise ValueError("Workspace was removed")
+            self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+            self.active_proposals.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(tenant_id)
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        return stored.get("durable", False)
+
+    def absorb_source(self, target_id, source_id, tenant_id, *, source_name=None):
+        """Finish moving one data source into a company, in one database commit.
+
+        The target's file already holds the moved tables. This saves its
+        durable copy, moves the source's question history over, and removes
+        the source the same way a delete does (pending proposals, notices,
+        stored copy, memory). The source's own file is deleted after commit.
+        """
+        from sqlalchemy import delete
+        from backend import database
+        from backend.models import Notification, PendingQuery, WorkspaceRecord
+        from backend.memory_deletions import enqueue, generation
+        from backend.source_blobs import delete_source
+
+        target = self.get_workspace(target_id)
+        source = self.get_workspace(source_id)
+        if (not target or not source or target_id == source_id
+                or target.get("owner_user_id") != tenant_id or source.get("owner_user_id") != tenant_id):
+            raise ValueError("Workspace not found")
+        with database.SessionLocal() as db:
+            target_generation = generation(db, tenant_id, target_id)
+
+        def action(db):
+            self._store_source_copy(db, self.workspaces[target_id])
+            record = db.get(WorkspaceRecord, source_id)
+            if record is None or record.tenant_id != tenant_id:
+                raise ValueError("Workspace not found")
+            enqueue(db, tenant_id, source_id)
+            db.execute(delete(PendingQuery).where(
+                PendingQuery.workspace_id == source_id, PendingQuery.tenant_id == tenant_id))
+            db.execute(delete(Notification).where(Notification.resource_id == source_id))
+            delete_source(db, source_id)
+            db.delete(record)
+
+        moved = 0
+        with self._edit(target_id, action):
+            if target_id not in self.workspaces or source_id not in self.workspaces:
+                raise ValueError("Workspace was removed")
+            existing_ids = {str(item.get("id")) for item in self.query_history.get(target_id, [])}
+            carried = []
+            for item in self.query_history.get(source_id, []):
+                if str(item.get("id")) in existing_ids:
+                    continue
+                entry = deepcopy(item)
+                entry["memory_generation"] = target_generation
+                entry["moved_from"] = source_name or source.get("name")
+                carried.append(entry)
+            combined = self.query_history.get(target_id, []) + carried
+            combined.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
+            self.query_history[target_id] = combined
+            moved = len(carried)
+            removed = self.workspaces.pop(source_id, None)
+            self.workspace_guardrails.pop(source_id, None)
+            self.query_history.pop(source_id, None)
+            for workspace_id in (source_id, target_id):
+                self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+                self.active_proposals.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(tenant_id)
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        uri = removed.get("database_uri") if isinstance(removed, dict) else None
+        if not uri and isinstance(removed, dict) and removed.get("source_ref"):
+            uri = f"sqlite:///{removed['source_ref']}"
+        with STATE_LOCK:
+            if uri and not any(ws.get("database_uri") == uri for ws in self.workspaces.values()):
+                from apps.core.workspaces import delete_workspace_files
+                delete_workspace_files(uri)
+        return moved
+
     def ensure_source_on_disk(self, workspace_id, tenant_id):
         """Bring back a wiped upload from its database copy before it is used.
 

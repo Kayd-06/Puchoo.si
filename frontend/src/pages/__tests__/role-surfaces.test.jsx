@@ -124,7 +124,7 @@ describe('role-aware product surfaces', () => {
     expect(document.getElementById('fileUpload')).toHaveAttribute('accept', '.csv,.xlsx');
     expect(screen.getByText(/upload CSV or Excel files/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Tally Sales Register and Balance Sheet exports \(XLSX or CSV\)/),
+      screen.getByText(/Tally exports \(XLSX or CSV\) and plain spreadsheets are supported/),
     ).toBeInTheDocument();
   });
 
@@ -143,8 +143,29 @@ describe('role-aware product surfaces', () => {
     });
     const file = new File(['x'], 'notes.txt', { type: 'text/plain' });
     fireEvent.change(input, { target: { files: [file] } });
-    expect(screen.getByText('Choose up to 20 CSV or XLSX files.')).toBeInTheDocument();
+    expect(screen.getByText('Choose CSV or XLSX files only.')).toBeInTheDocument();
     expect(cleared).toBe(true);
+  });
+
+  it('allows up to 10 files and opens a preview for each of several files', async () => {
+    renderRoute(<ConnectData />);
+    const input = document.getElementById('fileUpload');
+    const many = Array.from({ length: 11 }, (_, index) => new File(['a,b\n1,2'], `f${index}.csv`));
+    fireEvent.change(input, { target: { files: many } });
+    expect(
+      screen.getByText(
+        'You can upload up to 10 files at once. Remove some files and try again. You chose 11; pick 10 or fewer.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Upload CSV or Excel files, up to 10 at once.')).toBeInTheDocument();
+    await act(async () => {
+      fireEvent.change(input, { target: { files: many.slice(0, 10) } });
+    });
+    expect(
+      screen.getByRole('heading', { name: 'Check each file before saving' }),
+    ).toBeInTheDocument();
+    expect(screen.getByText('10 files selected')).toBeInTheDocument();
+    expect(screen.queryByText(/one at a time/)).toBeNull();
   });
 
   it('updates the decorative source word for upload, server and selected files', () => {

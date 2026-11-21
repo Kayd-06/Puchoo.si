@@ -49,3 +49,11 @@
   padding: 1px 7px;
   font-size: 0.66rem;
 }
+
+/* How many files a company holds, under its name in the picker. */
+.app-sidebar .workspace-picker-label .workspace-picker-count {
+  overflow: visible;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+}

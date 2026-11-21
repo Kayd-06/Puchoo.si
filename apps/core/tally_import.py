@@ -79,19 +79,26 @@ TRIAL_BALANCE_NOTE = (
 )
 
 
-def schema_note(table: str) -> str | None:
-    """Model-facing note for an importer-owned table (fixed text, no data)."""
+def schema_note_for_type(report_type: str) -> str | None:
+    """Model-facing note for a Tally report type (fixed text, no data)."""
 
-    for report_type, name in REPORT_TITLES.values():
-        if name != table:
-            continue
-        if report_type == VOUCHER_REGISTER:
-            return VOUCHER_NOTE
-        if report_type == TRIAL_BALANCE:
-            return TRIAL_BALANCE_NOTE
+    if report_type == VOUCHER_REGISTER:
+        return VOUCHER_NOTE
+    if report_type == TRIAL_BALANCE:
+        return TRIAL_BALANCE_NOTE
+    if report_type in SIDES:
         left, right = SIDES[report_type]
         report = "balance sheet" if report_type == BALANCE_SHEET else "profit and loss account"
         return STATEMENT_NOTE.format(report=report, groups=_STANDARD_GROUPS, sides=f"'{left}' or '{right}'")
+    return None
+
+
+def schema_note(table: str) -> str | None:
+    """Model-facing note for an importer-owned table name (fixed text, no data)."""
+
+    for report_type, name in REPORT_TITLES.values():
+        if name == table:
+            return schema_note_for_type(report_type)
     return None
 
 
@@ -937,6 +944,7 @@ __all__ = [
     "read_metadata",
     "save_report",
     "schema_note",
+    "schema_note_for_type",
     "suggest_header_row",
     "table_from_header_row",
     "write_metadata",

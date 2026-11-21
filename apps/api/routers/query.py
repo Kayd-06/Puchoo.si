@@ -34,6 +34,7 @@ from apps.core.workspaces import get_schema_catalog, get_schema_snapshot
 from apps.core.sarvam_client import SarvamClient, SarvamConfigurationError, MAX_TRANSLATION_CHARS
 from apps.core.semantic_layer import (
     build_query_plan,
+    focus_schema_for_question,
     parse_schema,
     plan_semantic_feedback,
     render_planned_question,
@@ -417,6 +418,11 @@ def generate_query(
             focused_schema = select_relevant_schema(schema, intent_plan)
             planned_question = render_planned_question(intent_plan)
             selected_tables = intent_plan.tables
+            if not intent_plan.tables:
+                # A company with many files: send only the tables the question names.
+                narrowed, narrowed_tables = focus_schema_for_question(schema, planning_question)
+                if narrowed_tables:
+                    focused_schema, selected_tables = narrowed, narrowed_tables
             public_plan = intent_plan.as_dict()
             structured_plan = None
         executor = _workspace_executor(workspace, controls)

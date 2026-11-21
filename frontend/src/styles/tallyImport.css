@@ -1,5 +1,7 @@
 /* Tally report preview and header-row picker on the Connect Data page. */
-.tally-preview {
+.tally-preview,
+.batch-import,
+.batch-results {
   --tp-surface: rgba(6, 8, 10, 0.86);
   --tp-raised: rgba(255, 255, 255, 0.045);
   --tp-line: rgba(215, 227, 237, 0.2);
@@ -13,6 +15,9 @@
   --tp-warn-bg: rgba(245, 181, 66, 0.12);
   --tp-warn-fg: #f6d58e;
   --tp-select: rgba(180, 221, 251, 0.14);
+}
+
+.tally-preview {
   width: min(100%, 830px);
   margin: 26px auto 0;
   border: 1px solid var(--tp-line);
@@ -25,7 +30,7 @@
   pointer-events: auto;
 }
 
-html[data-theme='light'] #root .tally-preview {
+html[data-theme='light'] #root :is(.tally-preview, .batch-import, .batch-results) {
   --tp-surface: #f2f4f6;
   --tp-raised: #e8ebef;
   --tp-line: #cdd3db;
@@ -276,4 +281,121 @@ html[data-theme='light'] #root .tally-preview {
   .tally-preview-facts {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+/* Company picker and table choice (Connect Data). */
+.company-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.company-picker label,
+.tally-preview-field,
+.connect-table-name {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  text-align: left;
+}
+
+.company-picker label > span,
+.tally-preview-field > span,
+.connect-table-name > span {
+  color: var(--tp-muted, var(--source-muted));
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+}
+
+.tally-preview .company-picker :is(select, input),
+.tally-preview-field :is(select, input) {
+  min-height: 38px;
+  border: 1px solid var(--tp-line);
+  border-radius: 9px;
+  background: var(--tp-raised);
+  color: var(--tp-text);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.tally-preview-destination {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 0;
+  border: 1px solid var(--tp-line);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.tally-preview-destination legend {
+  padding: 0 6px;
+  color: var(--tp-text);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.tally-preview-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--tp-text);
+  font-size: 0.82rem;
+}
+
+.tally-preview-modes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.tally-preview-hint {
+  margin: 0;
+  color: var(--tp-muted);
+  font-size: 0.74rem;
+  line-height: 1.5;
+}
+
+.tally-preview-mismatch {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  border: 1px solid color-mix(in srgb, var(--tp-warn-fg) 45%, transparent);
+  border-radius: 12px;
+  background: var(--tp-warn-bg);
+  padding: 12px 14px;
+  color: var(--tp-warn-fg);
+  font-size: 0.82rem;
+}
+
+.tally-preview-mismatch p {
+  margin: 4px 0 8px;
+  color: var(--tp-text);
+  line-height: 1.5;
+}
+
+.tally-preview-mismatch label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--tp-text);
+  font-weight: 600;
+}
+
+.connect-table-name {
+  width: min(100%, 830px);
+  margin: 18px auto 0;
+  pointer-events: auto;
+}
+
+.connect-table-name small {
+  color: var(--source-muted);
+  font-size: 0.72rem;
+}
+
+#root .app-container .connect-page .tally-preview-actions .connect-submit:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(0.7);
 }

@@ -47,10 +47,14 @@ export async function fetchApi(endpoint, options = {}) {
       if (response.status === 401) {
         window.dispatchEvent(new Event('puchoo:unauthorized'));
       }
+      const detail = data.detail && typeof data.detail === 'object' ? data.detail : null;
       const failure = new Error(
-        data.detail || data.message || `API request failed (${response.status})`,
+        (detail ? detail.message : data.detail) ||
+          data.message ||
+          `API request failed (${response.status})`,
       );
       failure.status = response.status;
+      if (detail?.code) failure.code = detail.code;
       throw failure;
     }
 

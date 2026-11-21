@@ -158,6 +158,130 @@ def balance_sheet_csv(
     return buffer.getvalue().encode("utf-8")
 
 
+# Fake ledgers for a multi-file company: bank book, a party ledger, payment
+# and receipt registers and an expense ledger. Rows are
+# (date, particulars, voucher type, voucher no, debit, credit).
+BANK_LEDGER = [
+    (datetime(2026, 11, 2), "Sharma Hardware Stores", "Receipt", "R-101", "48250.00", None),
+    (datetime(2026, 11, 5), "Office Rent", "Payment", "P-201", None, "18000.00"),
+    (datetime(2026, 11, 9), "Gupta Electricals", "Receipt", "R-102", "15600.00", None),
+    (datetime(2026, 11, 14), "Demo Freight Movers", "Payment", "P-202", None, "6400.00"),
+    (datetime(2026, 11, 22), "Patel Building Supplies", "Receipt", "R-103", "60000.00", None),
+]
+EXPENSE_LEDGER = [
+    (datetime(2026, 11, 5), "Office Rent", "Payment", "P-201", "18000.00", None),
+    (datetime(2026, 11, 14), "Freight Charges", "Payment", "P-202", "6400.00", None),
+    (datetime(2026, 11, 20), "Electricity Charges", "Journal", "J-31", "3250.00", None),
+]
+DEBTOR_RECEIPTS = [
+    (datetime(2026, 11, 2), "Sharma Hardware Stores", "Receipt", "R-101", None, "48250.00"),
+    (datetime(2026, 11, 9), "Gupta Electricals", "Receipt", "R-102", None, "15600.00"),
+    (datetime(2026, 11, 22), "Patel Building Supplies", "Receipt", "R-103", None, "60000.00"),
+]
+CREDITOR_PAYMENTS = [
+    (datetime(2026, 11, 6), "Demo Cement Works", "Payment", "P-203", "52000.00", None),
+    (datetime(2026, 11, 19), "Sample Steel Traders", "Payment", "P-204", "31500.00", None),
+]
+
+
+def register_xlsx(
+    report_name: str,
+    rows,
+    period: str = "1-Nov-26 to 30-Nov-26",
+    *,
+    company: str = COMPANY,
+) -> bytes:
+    """Any Tally voucher register or ledger export with Debit and Credit columns."""
+
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = report_name[:31]
+    header_block = [
+        company,
+        "Shop No. 12, Sample Market Road",
+        "Demo Nagar, Pune - 411000",
+        "Contact : 90000 11111",
+        "E-Mail : accounts@demotraders.example",
+        report_name,
+        period,
+    ]
+    for row, text in enumerate(header_block, start=1):
+        sheet.cell(row=row, column=1, value=text)
+    for column, text in enumerate(["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit"], start=1):
+        sheet.cell(row=8, column=column, value=text)
+    for column, text in enumerate(["", "", "", "", "Amount", "Amount"], start=1):
+        sheet.cell(row=9, column=column, value=text or None)
+    line = 10
+    debit_total = credit_total = Decimal(0)
+    for when, party, kind, number, debit, credit in rows:
+        sheet.cell(row=line, column=1, value=when)
+        sheet.cell(row=line, column=2, value=party)
+        sheet.cell(row=line, column=3, value=kind)
+        sheet.cell(row=line, column=4, value=number)
+        if debit:
+            sheet.cell(row=line, column=5, value=float(debit))
+            debit_total += Decimal(debit)
+        if credit:
+            sheet.cell(row=line, column=6, value=float(credit))
+            credit_total += Decimal(credit)
+        line += 1
+    sheet.cell(row=line, column=1, value="Total:")
+    sheet.cell(row=line, column=5, value=float(debit_total))
+    sheet.cell(row=line, column=6, value=float(credit_total))
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+PURCHASES = [
+    (datetime(2026, 11, 3), "Demo Cement Works", "Purchase", "PU-11", None, "52000.00"),
+    (datetime(2026, 11, 8), "Sample Steel Traders", "Purchase", "PU-12", None, "31500.00"),
+    (datetime(2026, 11, 17), "Demo Tiles Factory", "Purchase", "PU-13", None, "18250.00"),
+]
+JOURNALS = [
+    (datetime(2026, 11, 30), "Depreciation", "Journal", "J-40", "4500.00", None),
+    (datetime(2026, 11, 30), "Office Equipment", "Journal", "J-40", None, "4500.00"),
+]
+STOCK_SUMMARY_CSV = (
+    b"Demo Traders stock summary,,\nPrinted 19-Nov-26,,\n,,\nItem,Qty,Value\n"
+    b"Cement,10,\"3,500.00\"\nSteel,4,\"12,000.00\"\n"
+)
+
+
+def plain_xlsx(rows: list[list[object]], sheet: str = "Sheet1") -> bytes:
+    """A plain spreadsheet with a header row and no report header."""
+
+    from openpyxl import Workbook
+
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = sheet
+    for row in rows:
+        worksheet.append(row)
+    buffer = io.BytesIO()
+    workbook.save(buffer)
+    return buffer.getvalue()
+
+
+def batch_files() -> list[tuple[str, bytes]]:
+    """Ten different fake files for one company: 7 Tally reports and 3 plain files."""
+
+    return [
+        ("Sales Register.xlsx", sales_register_xlsx()),
+        ("Bank Book.xlsx", register_xlsx("Ledger Vouchers", BANK_LEDGER)),
+        ("Expenses Ledger.xlsx", register_xlsx("Ledger Vouchers", EXPENSE_LEDGER)),
+        ("Receipt Register.xlsx", register_xlsx("Receipt Register", DEBTOR_RECEIPTS)),
+        ("Payment Register.xlsx", register_xlsx("Payment Register", CREDITOR_PAYMENTS)),
+        ("Purchase Register.xlsx", register_xlsx("Purchase Register", PURCHASES)),
+        ("Journal Register.xlsx", register_xlsx("Journal Register", JOURNALS)),
+        ("Balance Sheet.csv", balance_sheet_csv()),
+        ("Stock Summary.csv", STOCK_SUMMARY_CSV),
+        ("Sales Targets.xlsx", plain_xlsx([["month", "sales_target"], ["Nov", 400000], ["Dec", 450000]], "Targets")),
+    ]
+
+
 def main() -> None:
     (HERE / "sales_register_nov26.xlsx").write_bytes(sales_register_xlsx())
     (HERE / "sales_register_dec26.xlsx").write_bytes(

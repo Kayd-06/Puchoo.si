@@ -33,7 +33,11 @@ export default function ReuploadSourceNotice({ source, canUpload, onReuploaded }
       });
       onReuploaded?.(workspace);
     } catch (failure) {
-      setError(failure.message || 'The file could not be uploaded. Please try again.');
+      setError(
+        failure.code === 'company_has_files'
+          ? `${failure.message} Reload the page to see it.`
+          : failure.message || 'The file could not be uploaded. Please try again.',
+      );
     } finally {
       setUploading(false);
     }
@@ -54,10 +58,11 @@ export default function ReuploadSourceNotice({ source, canUpload, onReuploaded }
           </p>
         ) : (
           <p>
-            The server restarted and its copy of this file was cleared. Upload the same file again
-            and you can keep asking questions. Your history and settings for {source.name} stay as
-            they are.
-            {isTally ? ' Use the Tally export (Excel or CSV) for this report.' : ''}
+            The server restarted and its copy of {source.name} was cleared, so there is nothing left
+            to delete. Upload one of its files here to bring it back; its history and settings stay
+            as they are. If it had several files, add the others afterwards from Data sources: they
+            go into {source.name} next to this one and nothing is replaced.
+            {isTally ? ' Use the Tally export (Excel or CSV) for a Tally report.' : ''}
           </p>
         )}
         {!isServer && !canUpload && (

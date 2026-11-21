@@ -548,3 +548,24 @@ html[data-theme='light'] #root .app-container .connect-page p.connect-error {
     background: none;
   }
 }
+
+/* Company picker under the chosen files, and the table name above the header picker. */
+.connect-selected-files .company-picker {
+  margin-top: 14px;
+}
+
+.connect-selected-files .company-picker :is(select, input),
+.connect-table-name input {
+  min-height: 40px;
+  border: 1px solid var(--source-line);
+  border-radius: 10px;
+  background: var(--source-input);
+  color: var(--source-text);
+  padding: 8px 11px;
+  font: inherit;
+  font-size: 0.86rem;
+}
+
+.connect-selected-files .company-picker label > span {
+  color: var(--source-muted);
+}

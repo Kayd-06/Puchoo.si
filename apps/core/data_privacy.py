@@ -8,6 +8,7 @@ the environment switches below. Every switch defaults to the private setting.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import re
@@ -60,7 +61,34 @@ def report_metadata_path(database_file: Path) -> Path:
 
 
 def is_financial_report_file(database_file: Path | None) -> bool:
-    return database_file is not None and report_metadata_path(database_file).is_file()
+    """True when any table in this source came from a Tally (financial) report.
+
+    A company can hold Tally reports and plain spreadsheets in one database.
+    Value hints are switched off for the whole source as soon as one Tally
+    report is in it. An unreadable or older-format sidecar is treated as
+    financial.
+    """
+
+    if database_file is None:
+        return False
+    path = report_metadata_path(database_file)
+    if not path.is_file():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    if not isinstance(payload, dict):
+        return True
+    if payload.get("kind") == "tally" or payload.get("reports"):
+        return True
+    files = payload.get("files")
+    if not isinstance(files, dict):
+        # Older sidecars were written only by the Tally importer.
+        return True
+    return any(
+        isinstance(entry, dict) and entry.get("kind") == "tally" for entry in files.values()
+    )
 
 
 _EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
