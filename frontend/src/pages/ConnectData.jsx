@@ -89,7 +89,11 @@ export default function ConnectData() {
     );
   }
 
-  const tallySources = workspaces.filter((workspace) => workspace.source_type === 'tally_report');
+  // A wiped source with no stored copy can't take more reports until it is re-uploaded.
+  const tallySources = workspaces.filter(
+    (workspace) =>
+      workspace.source_type === 'tally_report' && workspace.availability !== 'unavailable',
+  );
 
   const resetImport = () => {
     setTallyPreview(null);

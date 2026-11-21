@@ -30,6 +30,7 @@ from apps.core.workspaces import (
     tally_overlap,
     create_server_workspace,
     create_sqlite_workspace,
+    delete_workspace_files,
     create_tabular_workspace,
     create_tabular_collection_workspace,
     get_schema_metrics,
@@ -50,7 +51,7 @@ from apps.api.security import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
-PUBLIC_WORKSPACE_FIELDS = ("id", "name", "dialect", "source_type")
+PUBLIC_WORKSPACE_FIELDS = ("id", "name", "dialect", "source_type", "availability")
 MAX_UPLOAD_BYTES = settings.upload_max_bytes
 MAX_UPLOAD_FILES = settings.upload_max_files
 OLE_HEADER = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
@@ -290,6 +291,7 @@ def _import_target(target_workspace_id: str, user) -> Dict[str, Any] | None:
     workspace = session_manager.get_workspace(target)
     if not workspace or workspace.get("owner_user_id") != _owner_id(user):
         raise HTTPException(status_code=404, detail="Workspace not found or unauthorized")
+    workspace = session_manager.ensure_source_on_disk(target, _owner_id(user)) or workspace
     if workspace.get("source_type") != TALLY_SOURCE_TYPE:
         raise HTTPException(status_code=400, detail="Only an imported Tally data source can take more Tally reports.")
     return workspace
@@ -382,6 +384,7 @@ async def confirm_import(
             report = inspection.report
             if target is not None:
                 result = extend_tally_workspace(target, report)
+                session_manager.persist_source(target["id"], _owner_id(user))
                 session_manager.set_schema(target["id"], None)
                 create_notification(db, user_id=user.id, kind="workspace_uploaded", title="Tally report added",
                                     body=f"{report.metadata.report_name} added to {target.get('name', 'your data source')}.",
@@ -410,6 +413,65 @@ async def confirm_import(
     except ValueError as exc:
         logger.info("import confirm rejected type=%s", type(exc).__name__)
         raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
+
+
+@router.post("/{workspace_id}/reupload")
+async def reupload_source(
+    workspace_id: str,
+    file: UploadFile = File(...),
+    header_row: str = Form(""),
+    user=Depends(require_data_manager),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """Replace the file behind an existing source, keeping its id, name, history and guardrails.
+
+    Uses the same role check, size limits and format checks as a new upload.
+    """
+
+    tenant_id = _owner_id(user)
+    existing = session_manager.get_workspace(workspace_id)
+    if not existing or existing.get("owner_user_id") != tenant_id:
+        raise HTTPException(status_code=404, detail="Workspace not found or unauthorized")
+    if existing.get("source_type") == "server":
+        raise HTTPException(status_code=400, detail="A database connection can't be re-uploaded. Delete it and connect it again.")
+    filename = file.filename or "uploaded_file"
+    contents = await _read_upload(file)
+    _validated_upload_kind(filename, contents)
+    chosen_header = _header_row(header_row)
+    name = str(existing.get("name") or filename.rsplit(".", 1)[0])
+    try:
+        if chosen_header is not None:
+            replacement = create_header_row_workspace(name, filename, contents, chosen_header)
+        else:
+            inspection = inspect_upload(filename, contents)
+            if inspection.kind == "tally":
+                replacement, _ = create_tally_workspace(name, inspection.report)
+            elif existing.get("source_type") == TALLY_SOURCE_TYPE:
+                raise HTTPException(status_code=400, detail="This source was a Tally report. Upload the Tally export again.")
+            else:
+                replacement = create_tabular_workspace(name, filename, contents)
+    except UploadLimitError as exc:
+        logger.info("reupload rejected by resource limit status=%s", exc.status_code)
+        raise HTTPException(status_code=exc.status_code, detail=exc.message) from None
+    except TallyImportError as exc:
+        logger.info("tally reupload rejected type=%s", type(exc).__name__)
+        raise HTTPException(status_code=400, detail=str(exc)) from None
+    except ValueError as exc:
+        logger.info("reupload rejected type=%s", type(exc).__name__)
+        raise HTTPException(status_code=400, detail="The uploaded file could not be processed.") from None
+    try:
+        updated = session_manager.replace_source(workspace_id, tenant_id, replacement.as_dict())
+    except ValueError:
+        delete_workspace_files(replacement.database_uri)
+        raise HTTPException(status_code=404, detail="Workspace not found or unauthorized") from None
+    except Exception:
+        delete_workspace_files(replacement.database_uri)
+        raise
+    create_notification(db, user_id=user.id, kind="workspace_uploaded", title="Data source re-uploaded",
+                        body=f"{updated.get('name', 'Your data source')} is ready for read-only questions again.",
+                        resource_id=workspace_id)
+    db.commit()
+    return _public_workspace(updated)
 
 
 @router.get("/{workspace_id}")

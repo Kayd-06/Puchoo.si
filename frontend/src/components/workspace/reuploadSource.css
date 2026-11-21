@@ -1,0 +1,115 @@
+.reupload-notice {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 16px;
+  align-items: start;
+  width: min(760px, 100%);
+  margin: 0 auto;
+  padding: 20px 22px;
+  border: 1px solid rgba(245, 180, 80, 0.45);
+  border-radius: 16px;
+  background: rgba(245, 180, 80, 0.08);
+  color: var(--text-primary, #f5f1ea);
+  text-align: left;
+}
+
+.reupload-notice-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: rgba(245, 180, 80, 0.18);
+  color: #f5b450;
+}
+
+.reupload-notice-copy h2 {
+  margin: 6px 0 6px;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.reupload-notice-copy p {
+  margin: 0;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+.reupload-notice-copy .reupload-notice-hint {
+  margin-top: 8px;
+}
+
+.reupload-notice-copy .reupload-notice-error {
+  margin-top: 10px;
+  color: #ff8a80;
+  opacity: 1;
+}
+
+.reupload-notice-tag,
+.source-needs-reupload-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(245, 180, 80, 0.18);
+  color: #f5b450;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.reupload-notice-input {
+  display: none;
+}
+
+.reupload-notice-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 10px;
+  background: #f5b450;
+  color: #1d1408;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.reupload-notice-button:disabled {
+  opacity: 0.7;
+  cursor: progress;
+}
+
+.reupload-notice-button:focus-visible {
+  outline: 2px solid #f5b450;
+  outline-offset: 3px;
+}
+
+html[data-theme='light'] .reupload-notice {
+  color: #2b2116;
+  background: rgba(214, 140, 30, 0.08);
+  border-color: rgba(176, 110, 20, 0.45);
+}
+
+html[data-theme='light'] .reupload-notice-tag,
+html[data-theme='light'] .source-needs-reupload-tag,
+html[data-theme='light'] .reupload-notice-icon {
+  color: #8a5300;
+  background: rgba(214, 140, 30, 0.16);
+}
+
+html[data-theme='light'] .reupload-notice-copy .reupload-notice-error {
+  color: #b3261e;
+}
+
+@media (max-width: 720px) {
+  .reupload-notice {
+    grid-template-columns: auto 1fr;
+  }
+
+  .reupload-notice-actions {
+    grid-column: 1 / -1;
+  }
+}

@@ -33,11 +33,33 @@ Every log record is scrubbed when it is created, before any handler prints it:
 - the query pipeline logs route, table names, counts and SQL with literals
   removed. It does not log the question, rows or repair feedback.
 
+## Where uploaded data is stored
+
+An upload is turned into a SQLite file on the server's disk. Render's free plan
+wipes that disk on every restart or redeploy, so the app also keeps a
+compressed (zlib) copy of that SQLite file in the app database (the
+`workspace_source_blobs` table in Neon Postgres). For a Tally report the small
+report metadata file is kept with it. When the file is missing on disk, the app
+writes it back from this copy before answering. A copy can only be restored for
+the same source and the same organization it was saved for. The copy is never
+sent to any outside service, and its contents are never logged (only the
+source id and byte counts).
+
+Copies larger than 50 MiB after compression are not kept (change this with
+`PUCHOO_SOURCE_BLOB_MAX_BYTES`). Such a source works until the next restart and
+then shows "Needs re-upload". A source wiped before this copy existed also
+shows "Needs re-upload"; uploading the file again keeps the same source, its
+name, history and settings.
+
+Database backups (`backend/backups.py`) include these copies, because they are
+part of the database.
+
 ## Deleting an upload
 
 Only the workspace owner can delete a data source (admins can still upload and
 connect sources). That removes the stored SQLite file and its journal files, the report metadata
-sidecar, the workspace row and its history (cascade), pending queries, its
+sidecar, the copy of the file kept in the database, the workspace row and its
+history (cascade), pending queries, its
 notifications, cached translations, and schedules removal of its conversation
 memory. The original uploaded file is never written to disk; it is parsed in
 memory.
@@ -45,7 +67,8 @@ memory.
 The owner of a business or school can also delete the whole organization from
 Settings. That needs the exact organization name and the owner's current
 password, is rate limited, and removes every account, session, invite, source
-and its derived state, including cached translations. The only log line is
+and its derived state, including the file copies kept in the database and
+cached translations. The only log line is
 `organization_deleted` with the tenant id and the number of accounts removed.
 
 ## Real data and git

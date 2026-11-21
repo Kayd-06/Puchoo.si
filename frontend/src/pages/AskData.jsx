@@ -28,6 +28,7 @@ import { useAuth } from '../context/AuthContext';
 import { can } from '../auth/capabilities';
 import CalculatingStatus from '../components/CalculatingStatus';
 import SharedDataEmptyState from '../components/workspace/SharedDataEmptyState';
+import ReuploadSourceNotice, { needsReupload } from '../components/workspace/ReuploadSourceNotice';
 import {
   useChatState,
   chatScope,
@@ -51,7 +52,8 @@ import '../styles/chatActions.css';
 import '../styles/queryReport.css';
 
 const ResultCharts = lazy(() => import('../components/ResultCharts'));
-const STOP_ANALYSIS_STATUSES = new Set([401, 403, 503]);
+// 409 means the source itself is unavailable, so every other part would fail the same way.
+const STOP_ANALYSIS_STATUSES = new Set([401, 403, 409, 503]);
 
 const DEFAULT_RESULT_LABELS = {
   executive_summary: 'Executive summary',
@@ -687,8 +689,10 @@ export default function AskData() {
     activeWorkspaceId,
     activeWorkspace,
     refreshWorkspaces,
+    updateWorkspace,
     loading: workspaceLoading,
   } = useAppContext();
+  const sourceNeedsReupload = needsReupload(activeWorkspace);
   const { user } = useAuth();
   const scope = chatScope(user, activeWorkspaceId);
   const currentScope = useRef(scopeKey(scope));
@@ -789,7 +793,12 @@ export default function AskData() {
 
   const reportError = async (err, fallback) => {
     const message = err.message || fallback;
-    if (message.toLowerCase().includes('workspace not found')) {
+    if (err.status === 409 && activeWorkspaceId) {
+      // The server lost this source's file. Show the re-upload card, not a raw error,
+      // and stop sending questions until it is fixed.
+      updateWorkspace({ id: activeWorkspaceId, availability: 'unavailable' });
+      setError('');
+    } else if (message.toLowerCase().includes('workspace not found')) {
       await refreshWorkspaces();
       setError(
         'The previous workspace was no longer active. Your saved workspaces were refreshed; please try again.',
@@ -853,6 +862,7 @@ export default function AskData() {
     if (
       !submittedQuestion.trim() ||
       !scope ||
+      sourceNeedsReupload ||
       loading ||
       (queryInFlightRef.current && requestCurrent(queryInFlightRef.current))
     )
@@ -1409,6 +1419,16 @@ export default function AskData() {
             <Link className="ask-connect-action" to="/connect">
               <Database size={17} /> Connect a data source <ArrowUpRight size={16} />
             </Link>
+          ) : sourceNeedsReupload ? (
+            <ReuploadSourceNotice
+              key={activeWorkspace.id}
+              source={activeWorkspace}
+              canUpload={can(user, 'manage_data_sources')}
+              onReuploaded={(workspace) => {
+                setError('');
+                updateWorkspace({ ...workspace, availability: 'available' });
+              }}
+            />
           ) : (
             <div className={`ask-prompt-shell${loading ? ' is-loading' : ''}`} aria-busy={loading}>
               <textarea

@@ -269,7 +269,7 @@ def test_workspace_listing_refreshes_persisted_shared_sources(tmp_path, monkeypa
     manager._clock = lambda: now[0]
     monkeypatch.setattr(router, "session_manager", manager)
     user = _user("owner" if role == "owner" else "member", owner_id=None if role == "owner" else "owner", role=role)
-    assert router.list_workspaces(user=user) == [{"id": "shared", "name": "Sales", "source_type": "spreadsheet"}]
+    assert router.list_workspaces(user=user) == [{"id": "shared", "name": "Sales", "source_type": "spreadsheet", "availability": "available"}]
     assert manager.get_workspace("shared")["owner_user_id"] == "owner"
     from apps.core.workspaces import get_schema_snapshot
     assert "Table: sales" in get_schema_snapshot(manager.get_workspace("shared")["database_uri"])
