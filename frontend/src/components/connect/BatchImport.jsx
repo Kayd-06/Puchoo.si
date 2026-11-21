@@ -498,6 +498,9 @@ export default function BatchImport({
       // Every ledger export is called "Ledger Vouchers"; the file name tells them apart
       // in the files list. Labels stay on the server and are never sent to the AI.
       if (preview.table === LEDGER_TABLE) fields.label = item.file.name.replace(/\.[^.]+$/, '');
+      // Every ledger export is called "Ledger Vouchers"; the file name tells them apart
+      // in the files list. Labels stay on the server and are never sent to the AI.
+      if (preview.table === LEDGER_TABLE) fields.label = item.file.name.replace(/\.[^.]+$/, '');
     } else {
       fields.table_name = item.tableName.trim();
     }

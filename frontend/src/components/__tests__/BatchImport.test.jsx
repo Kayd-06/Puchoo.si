@@ -323,4 +323,20 @@ describe('batch upload', () => {
       expect(screen.getByText('Other Sales.xlsx').closest('li')).toHaveTextContent('3 rows added'),
     );
   });
+
+  it('names each ledger after its file so two ledgers are easy to tell apart', async () => {
+    const ledger = tallyPreview('Ledger Vouchers', { table: 'ledger_vouchers' });
+    const confirms = mockServer({
+      'Bank Book.xlsx': ledger,
+      'Sales Register.xlsx': tallyPreview('Sales Register'),
+    });
+    renderBatch([file('Bank Book.xlsx'), file('Sales Register.xlsx')]);
+    await waitForPreviews();
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Save 2 files/ }));
+    });
+    await screen.findByRole('heading', { name: '2 files added to Demo Traders' });
+    expect(confirms[0]).toMatchObject({ fileName: 'Bank Book.xlsx', label: 'Bank Book' });
+    expect(confirms[1].label).toBeUndefined();
+  });
 });
