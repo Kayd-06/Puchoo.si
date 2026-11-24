@@ -152,6 +152,23 @@ it('decorative context failure never prevents mounting the interface', () => {
   expect(frames.size).toBe(0);
   expect(view.container.querySelector('canvas').width).toBe(0);
 });
+it('uses light ambient dust only in light mode and restores the original dark renderer', async () => {
+  document.documentElement.dataset.theme = 'light';
+  const view = render(<QueryUniverse />);
+  frame(0);
+  // The light renderer paints sparse dust rather than the dark orbital ellipses.
+  expect(context.fillStyle).toMatch(/^hsla\(/);
+  expect(context.fillRect).toHaveBeenCalled();
+  expect(context.ellipse).not.toHaveBeenCalled();
+  await act(async () => {
+    document.documentElement.dataset.theme = 'dark';
+  });
+  frame(0);
+  expect(context.ellipse).toHaveBeenCalled();
+  expect(context.fillStyle).toMatch(/^rgba\(/);
+  view.unmount();
+  delete document.documentElement.dataset.theme;
+});
 it('enforces policy count/pixel bounds across synthetic viewports and device hints', () => {
   for (const width of [1, 360, 719, 720, 1920, 4096, 10000])
     for (const height of [1, 720, 2160, 10000])

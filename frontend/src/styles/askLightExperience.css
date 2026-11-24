@@ -1,0 +1,192 @@
+/* Light colors and motion only; geometry is shared with dark mode. */
+.ask-query-transition {
+  display: none;
+}
+html[data-theme='light'] #root .app-container .ask-page canvas.ask-universe {
+  display: block;
+  opacity: 1;
+  z-index: 0;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-stage {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bg-main);
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-stage::before {
+  content: '';
+  display: block;
+  position: absolute;
+  z-index: -1;
+  inset: -20%;
+  opacity: 1;
+  pointer-events: none;
+  background: radial-gradient(#c5c0b5 0.65px, transparent 0.9px) 0 0 / 32px 32px;
+  mask-image: linear-gradient(90deg, #00000050, transparent 35%, transparent 65%, #00000050);
+  filter: none;
+  animation: ask-paper-grid 30s linear infinite;
+}
+
+html[data-theme='light'] #root .app-container .ask-page .ask-stage h1 {
+  color: #252622;
+  animation: ask-light-arrive 0.7s ease-out both;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-stage-content > p {
+  color: #79796f;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell {
+  border: 1px solid #dedbd3;
+  background: #fffefa;
+  box-shadow:
+    0 3px 5px #35302003,
+    0 18px 50px -20px #574c3326,
+    inset 0 1px 0 #ffffff;
+  overflow: hidden;
+  transition:
+    border-color 0.25s,
+    box-shadow 0.25s;
+  animation: ask-light-arrive 0.7s ease-out 0.12s both;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell:focus-within {
+  border-color: #ada18a;
+  box-shadow:
+    0 0 0 3px #b8a27c12,
+    0 18px 50px -20px #574c3326;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell textarea {
+  color: #30312b;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell textarea::placeholder {
+  color: #a09c91;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-controls {
+  border-top: 0;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-meta > span:first-child {
+  background: transparent;
+  color: #8c877a;
+}
+html[data-theme='light'] #root .app-container .ask-page .voice-button:not(.is-recording) {
+  background: #f5f3ed;
+  border-color: #e8e4d9;
+  color: #716d61;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-submit-button:not(:disabled) {
+  background: #30332b;
+  color: #fffefa;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-submit-button:disabled {
+  background: #eeebe3;
+  color: #a6a08f;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-stage-footer {
+  color: #aaa393;
+}
+@keyframes ask-paper-grid {
+  to {
+    background-position: 32px 32px;
+  }
+}
+@keyframes ask-light-arrive {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 15%, #9c8b6d 48%, transparent 80%);
+  background-size: 220% 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell:focus-within::after {
+  opacity: 0.8;
+  animation: ask-focus-flow 4s ease-in-out infinite;
+}
+@keyframes ask-focus-flow {
+  0%,
+  100% {
+    background-position: 0 0;
+  }
+  50% {
+    background-position: 100% 0;
+  }
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell.is-loading::after {
+  opacity: 1;
+  animation: ask-focus-flow 1.5s ease-in-out infinite;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell.is-loading {
+  border-color: #b9ad96;
+  box-shadow:
+    0 0 0 3px #b8a27c0d,
+    0 18px 50px -20px #574c3326;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-results {
+  animation: ask-answer-arrive 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-results .result-stack > * {
+  animation: ask-answer-arrive 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.08s both;
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-results .result-stack > :nth-child(2) {
+  animation-delay: 0.16s;
+}
+html[data-theme='light']
+  #root
+  .app-container
+  .ask-page
+  .ask-results
+  .result-stack
+  > :nth-child(n + 3) {
+  animation-delay: 0.24s;
+}
+@keyframes ask-answer-arrive {
+  from {
+    opacity: 0;
+    translate: 0 12px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+html[data-theme='light'] #root .app-container .ask-page .ask-submit-button svg {
+  transition: translate 0.2s ease;
+}
+html[data-theme='light']
+  #root
+  .app-container
+  .ask-page
+  .ask-submit-button:hover:not(:disabled)
+  svg {
+  translate: 2px -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme='light']
+    #root
+    .app-container
+    .ask-page
+    :is(.ask-query-transition, .ask-results, .ask-results .result-stack > *),
+  html[data-theme='light'] .ask-generation-sheet::after {
+    animation: none !important;
+    translate: none;
+  }
+  html[data-theme='light'] #root .app-container .ask-page .ask-stage::before,
+  html[data-theme='light'] #root .app-container .ask-page .ask-prompt-shell::after,
+  html[data-theme='light'] #root .app-container .ask-page :is(.ask-stage h1, .ask-prompt-shell) {
+    animation: none !important;
+    translate: none;
+  }
+}

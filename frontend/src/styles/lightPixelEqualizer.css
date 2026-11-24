@@ -1,0 +1,67 @@
+.ask-light-equalizer {
+  display: none;
+}
+html[data-theme='light'] .ask-light-equalizer {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  left: 50%;
+  bottom: 14px;
+  width: 72px;
+  height: 20px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+html[data-theme='light'] .ask-light-equalizer i {
+  width: 2px;
+  height: var(--height);
+  border-radius: 2px;
+  background: #9b8b71;
+  opacity: 0.42;
+  transform: scaleY(0.35);
+  animation: ask-signal-breathe 5s ease-in-out infinite;
+  animation-delay: calc(var(--index) * -0.12s);
+}
+html[data-theme='light']
+  .ask-light-equalizer:is([data-state='thinking'], [data-state='recording'])
+  i {
+  opacity: 0.85;
+  animation: ask-signal-active 1.1s ease-in-out infinite;
+  animation-delay: calc(var(--index) * -0.1s);
+}
+html[data-theme='light'] .ask-light-equalizer[data-state='recording'] i {
+  animation-duration: 0.65s;
+}
+html[data-theme='light'] .ask-light-equalizer.is-standalone {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  margin: 20px auto 0;
+  transform: none;
+}
+@keyframes ask-signal-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+@keyframes ask-signal-active {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html[data-theme='light'] .ask-light-equalizer i {
+    animation: none !important;
+    transform: scaleY(0.5);
+  }
+}

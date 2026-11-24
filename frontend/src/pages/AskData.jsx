@@ -2,7 +2,9 @@ import { splitAnalyses } from '../utils/splitAnalyses';
 import { analysisLabels } from '../utils/analysisLanguage';
 import { chartExportData } from '../utils/resultCharts';
 import { universePolicy } from '../utils/universePolicy';
+import { paintLightDataField } from '../utils/lightDataField';
 import '../styles/askComposer.css';
+import '../styles/askLightExperience.css';
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -27,6 +29,8 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { can } from '../auth/capabilities';
 import CalculatingStatus from '../components/CalculatingStatus';
+import LightPixelEqualizer from '../components/LightPixelEqualizer';
+import ResultGenerationPreview from '../components/ResultGenerationPreview';
 import SharedDataEmptyState from '../components/workspace/SharedDataEmptyState';
 import {
   useChatState,
@@ -298,6 +302,7 @@ export function queryUniversePalette(theme) {
 export function QueryUniverse() {
   const canvasRef = useRef(null);
   const pointerRef = useRef({ x: 0, y: 0, active: false });
+  const lightRenderer = paintLightDataField;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -430,6 +435,17 @@ export function QueryUniverse() {
       }
       const centerX = width / 2;
       const centerY = height * 0.58;
+      if (document.documentElement.dataset.theme === 'light') {
+        lightRenderer(context, {
+          width,
+          height,
+          time,
+          pointer: pointerRef.current,
+          staticMode: policy.mode === 'static',
+        });
+        context.restore();
+        return;
+      }
       const palette = queryUniversePalette(document.documentElement.dataset.theme);
       context.globalCompositeOperation = palette.composite;
       const pointer = pointerRef.current;
@@ -630,7 +646,7 @@ export function QueryUniverse() {
       canvas.width = canvas.height = 0;
       context = null;
     };
-  }, []);
+  }, [lightRenderer]);
 
   return <canvas ref={canvasRef} className="ask-universe" aria-hidden="true" />;
 }
@@ -1387,7 +1403,7 @@ export default function AskData() {
   }
 
   return (
-    <div className="ask-page">
+    <div className={`ask-page${result ? ' has-result' : ''}`}>
       {welcomeNotice}
       <section className="ask-stage">
         <QueryUniverse />
@@ -1406,9 +1422,12 @@ export default function AskData() {
           </p>
 
           {!activeWorkspace ? (
-            <Link className="ask-connect-action" to="/connect">
-              <Database size={17} /> Connect a data source <ArrowUpRight size={16} />
-            </Link>
+            <>
+              <Link className="ask-connect-action" to="/connect">
+                <Database size={17} /> Connect a data source <ArrowUpRight size={16} />
+              </Link>
+              <LightPixelEqualizer standalone />
+            </>
           ) : (
             <div className={`ask-prompt-shell${loading ? ' is-loading' : ''}`} aria-busy={loading}>
               <textarea
@@ -1502,8 +1521,13 @@ export default function AskData() {
                   )}
                 </div>
               </div>
+              <LightPixelEqualizer
+                state={loading || voiceState === 'transcribing' ? 'thinking' : voiceState}
+              />
             </div>
           )}
+
+          {loading && <ResultGenerationPreview />}
 
           {analyses.length > 1 && (
             <section
@@ -1832,7 +1856,7 @@ export default function AskData() {
                     </thead>
                     <tbody>
                       {result.record.rows.map((row, index) => (
-                        <tr key={index}>
+                        <tr key={index} style={index < 12 ? { '--result-row': index } : undefined}>
                           {result.record.columns.map((c) => (
                             <td key={c}>
                               {(presentation.display_rows?.[index] || row)[c]?.toString() || '—'}

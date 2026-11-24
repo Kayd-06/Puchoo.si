@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import '../styles/connectTabs.css';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Check, FileSpreadsheet, Server, ShieldCheck, Upload, X } from 'lucide-react';
+import {
+  ArrowUpRight,
+  FileSpreadsheet,
+  LoaderCircle,
+  Server,
+  ShieldCheck,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { can } from '../auth/capabilities';
 import TallyImportPreview from '../components/connect/TallyImportPreview';
 import HeaderRowPicker from '../components/connect/HeaderRowPicker';
+import SourceIllustration from '../components/connect/SourceIllustration';
 
 const ACCEPTED_FILES = '.csv,.xlsx';
 export const NUMBERS_FILE_MESSAGE =
@@ -44,6 +53,7 @@ export default function ConnectData() {
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [createdWorkspace, setCreatedWorkspace] = useState(null);
+  const [uploadedFileCount, setUploadedFileCount] = useState(0);
   const [importSummary, setImportSummary] = useState(null);
   const [tallyPreview, setTallyPreview] = useState(null);
   const [tallyTarget, setTallyTarget] = useState('');
@@ -121,6 +131,7 @@ export default function ConnectData() {
     setActiveWorkspaceId(workspace.id);
     setCreatedWorkspace(workspace);
     setImportSummary(summary);
+    setUploadedFileCount(selectedFiles.length);
     setSelectedFiles([]);
     setWorkspaceName('');
     resetImport();
@@ -315,6 +326,7 @@ export default function ConnectData() {
                 aria-selected={activeTab === 'upload'}
                 className={activeTab === 'upload' ? 'is-active' : ''}
                 onClick={() => setActiveTab('upload')}
+                disabled={uploading || connecting}
               >
                 <Upload size={15} /> Upload files
               </button>
@@ -324,6 +336,7 @@ export default function ConnectData() {
                 aria-selected={activeTab === 'server'}
                 className={activeTab === 'server' ? 'is-active' : ''}
                 onClick={() => setActiveTab('server')}
+                disabled={uploading || connecting}
               >
                 <Server size={15} /> Connect server
               </button>
@@ -331,11 +344,25 @@ export default function ConnectData() {
 
             {createdWorkspace ? (
               <div className="connect-complete" role="status">
-                <div>
-                  <Check size={22} />
+                <div className="connect-complete-art">
+                  <SourceIllustration
+                    state="success"
+                    variant={createdWorkspace.source_type === 'server' ? 'link' : 'upload'}
+                    fileCount={uploadedFileCount}
+                  />
                 </div>
-                <span>Workspace ready</span>
-                <h1>{createdWorkspace.name}</h1>
+                <h1>
+                  {createdWorkspace.source_type === 'server'
+                    ? 'Connection Successful'
+                    : 'Import Successful'}
+                </h1>
+                <p className="connect-complete-name">{createdWorkspace.name} · Workspace ready</p>
+                {createdWorkspace.source_type !== 'server' && (
+                  <p>
+                    {uploadedFileCount} {uploadedFileCount === 1 ? 'file' : 'files'} uploaded
+                    successfully.
+                  </p>
+                )}
                 <p>Your source is now isolated and available for verified, read-only analysis.</p>
                 {importSummary?.kind === 'tally' && (
                   <p className="connect-import-summary">
@@ -358,11 +385,7 @@ export default function ConnectData() {
               </div>
             ) : activeTab === 'upload' ? (
               <div className="connect-upload-flow">
-                <h1>Upload your data</h1>
-                <p>Upload CSV or Excel files, up to 20 at once.</p>
-                <p className="connect-upload-note">
-                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported.
-                </p>
+                <h1 className="connect-sr-only">Upload your data</h1>
                 <input
                   id="fileUpload"
                   type="file"
@@ -379,33 +402,54 @@ export default function ConnectData() {
                 <label
                   htmlFor="fileUpload"
                   className={`connect-dropzone${isDragging ? ' is-dragging' : ''}${uploading ? ' is-uploading' : ''}`}
+                  aria-busy={uploading}
                   onDragOver={(event) => {
                     event.preventDefault();
-                    setIsDragging(true);
+                    if (!uploading) setIsDragging(true);
                   }}
-                  onDragLeave={() => setIsDragging(false)}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setIsDragging(false);
+                  }}
                   onDrop={(event) => {
                     event.preventDefault();
                     setIsDragging(false);
                     selectFiles(event.dataTransfer.files);
                   }}
                 >
-                  <div className="connect-dropzone-mark">
-                    <Upload size={23} />
-                  </div>
-                  <strong>
+                  <SourceIllustration
+                    state={uploading ? 'uploading' : 'idle'}
+                    fileCount={selectedFiles.length}
+                  />
+                  <strong className="connect-upload-title" role="status">
+                    {uploading && (
+                      <LoaderCircle
+                        size={20}
+                        className="connect-upload-spinner"
+                        aria-hidden="true"
+                      />
+                    )}
                     {uploading
-                      ? 'Creating isolated workspace…'
+                      ? 'Uploading Files'
                       : selectedFiles.length
                         ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
-                        : 'Drop files here'}
+                        : 'Upload Files'}
                   </strong>
-                  <span>
-                    {uploading
-                      ? 'Validating structure and access boundaries'
-                      : 'or browse from your device'}
+                  <span className="connect-dropzone-description">
+                    {uploading ? (
+                      'Validating your data and preparing your workspace'
+                    ) : (
+                      <>
+                        Drag and drop your files here, or <b>click to select.</b>
+                      </>
+                    )}
                   </span>
+                  <span className="connect-dropzone-formats">Supported formats: .xlsx, .csv</span>
                 </label>
+
+                <p className="connect-upload-note">Upload CSV or Excel files, up to 20 at once.</p>
+                <p className="connect-upload-note">
+                  Tally Sales Register and Balance Sheet exports (XLSX or CSV) are supported.
+                </p>
 
                 {tallyPreview && (
                   <TallyImportPreview
@@ -470,6 +514,9 @@ export default function ConnectData() {
               </div>
             ) : (
               <form className="connect-server-form" onSubmit={connectServer} noValidate>
+                <div className="connect-server-art">
+                  <SourceIllustration variant="link" state={connecting ? 'uploading' : 'idle'} />
+                </div>
                 <h1>Connect your database</h1>
                 <p>Link PostgreSQL or MySQL using a read-only database user.</p>
                 <div className="connect-server-grid">

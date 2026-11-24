@@ -1,0 +1,234 @@
+/* Shared geometry, with separate neutral materials for the two themes. */
+.source-illustration {
+  --art-paper-top: #303030;
+  --art-paper-bottom: #222222;
+  --art-fold: #252525;
+  --art-line: #3b3b3b;
+  --art-ink: #a2a2a2;
+  --art-grid: #525252;
+  --art-grid-line: #3f3f3f;
+  --art-badge: #929292;
+  --art-badge-ink: #303030;
+  --art-folder-edge: #444444;
+  --art-folder-mid: #3a3a3a;
+  --art-folder-end: #303030;
+  display: block;
+  flex: none;
+  width: min(250px, 100%);
+  height: 215px;
+  overflow: visible;
+  pointer-events: none;
+}
+html[data-theme='light'] .source-illustration {
+  --art-paper-top: #e5e5e5;
+  --art-paper-bottom: #cccccc;
+  --art-fold: #bdbdbd;
+  --art-line: #b6b6b6;
+  --art-ink: #5b5b5b;
+  --art-grid: #b0b0b0;
+  --art-grid-line: #cdcdcd;
+  --art-badge: #777777;
+  --art-badge-ink: #f7f7f7;
+  --art-folder-edge: #bdbdbd;
+  --art-folder-mid: #cecece;
+  --art-folder-end: #a4a4a4;
+}
+.source-sheet {
+  transform-origin: 140px 175px;
+  transition:
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 400ms;
+}
+.source-sheet--left {
+  transform: translate(-8px, 7px) rotate(-10deg);
+}
+.source-sheet--right {
+  transform: translate(9px, 7px) rotate(11deg);
+}
+.source-sheet--front {
+  animation: source-paper-breathe 5s ease-in-out infinite;
+}
+.connect-dropzone:is(:hover, :focus-within, .is-dragging) .source-sheet--left,
+.connect-file-input:focus-visible + .connect-dropzone .source-sheet--left {
+  transform: translate(-12px, 4px) rotate(-29deg);
+}
+.connect-dropzone:is(:hover, :focus-within, .is-dragging) .source-sheet--right,
+.connect-file-input:focus-visible + .connect-dropzone .source-sheet--right {
+  transform: translate(12px, 4px) rotate(27deg);
+}
+.source-folder-back,
+.source-folder-front {
+  opacity: 0;
+  transform: translateY(20px) scale(0.88);
+  transform-origin: 140px 180px;
+  transition:
+    opacity 450ms,
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.source-illustration:is([data-state='uploading'], [data-state='success'])
+  :is(.source-folder-back, .source-folder-front) {
+  opacity: 1;
+  transform: none;
+}
+.source-illustration[data-state='uploading'] .source-sheet {
+  animation: source-paper-import 2.4s cubic-bezier(0.45, 0, 0.3, 1) infinite;
+}
+.source-illustration[data-state='uploading'] .source-sheet--left {
+  animation-delay: -0.8s;
+}
+.source-illustration[data-state='uploading'] .source-sheet--right {
+  animation-delay: -1.6s;
+}
+.source-illustration[data-state='success'] .source-stack {
+  opacity: 0;
+  transition: opacity 400ms;
+}
+.source-illustration[data-state='success'] :is(.source-folder-back, .source-folder-front) {
+  transform: translateY(-27px);
+}
+.source-folder-label,
+.source-folder-detail {
+  font:
+    600 14px Arial,
+    sans-serif;
+  fill: #ededed;
+}
+.source-folder-detail {
+  font-size: 12px;
+  font-weight: 400;
+  fill: #b9b9b9;
+}
+.source-file-counter {
+  transform: translateY(var(--counter-offset));
+  animation: source-count-up 0.85s steps(var(--file-count), end) both;
+}
+.source-illustration[data-state='uploading'] .source-file-count-pending {
+  animation: source-folder-glint 1.6s ease-in-out infinite;
+}
+@keyframes source-count-up {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(var(--counter-offset));
+  }
+}
+html[data-theme='light'] .source-folder-label {
+  fill: #242424;
+}
+html[data-theme='light'] .source-folder-detail {
+  fill: #484848;
+}
+.source-folder-shine {
+  animation: source-folder-glint 3s ease-in-out infinite;
+}
+.source-link-left,
+.source-link-right,
+.source-link-chain {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: source-link-drift 5s ease-in-out infinite;
+}
+.source-link-right {
+  animation-delay: -2.5s;
+}
+.source-link-chain {
+  animation-name: source-link-join;
+  animation-duration: 4s;
+}
+.source-link-packet {
+  animation: source-link-travel 3s linear infinite;
+}
+.source-illustration[data-state='uploading'] .source-link-packet {
+  animation-duration: 1s;
+}
+.source-link-check {
+  stroke-dasharray: 45;
+  animation: source-check-draw 0.65s ease-out both;
+}
+.source-illustration[data-state='success']
+  :is(.source-link-left, .source-link-right, .source-link-chain, .source-link-packet) {
+  animation: none;
+}
+@keyframes source-paper-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes source-paper-import {
+  0% {
+    opacity: 0;
+    transform: translate(0, -65px) scale(0.68) rotate(-9deg);
+  }
+  15% {
+    opacity: 1;
+  }
+  64% {
+    opacity: 1;
+    transform: translate(0, 24px) scale(0.68) rotate(0);
+  }
+  82%,
+  100% {
+    opacity: 0;
+    transform: translate(0, 65px) scale(0.6);
+  }
+}
+@keyframes source-folder-glint {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes source-link-drift {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-5px);
+  }
+}
+@keyframes source-link-join {
+  0%,
+  100% {
+    transform: scale(0.94);
+    opacity: 0.65;
+  }
+  50% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+@keyframes source-link-travel {
+  from {
+    stroke-dashoffset: 189;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes source-check-draw {
+  from {
+    stroke-dashoffset: 45;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .source-illustration *,
+  .source-illustration use {
+    animation: none !important;
+    transition: none !important;
+  }
+  .source-illustration[data-state='uploading'] .source-stack {
+    opacity: 0;
+  }
+}
