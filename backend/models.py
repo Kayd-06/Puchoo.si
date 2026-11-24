@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import Index, Boolean, func, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Index, Boolean, func, DateTime, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.database import Base
@@ -72,6 +72,25 @@ class WorkspaceRecord(Base):
     metadata_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, server_default=func.now(), nullable=False)
+
+
+class WorkspaceSourceBlob(Base):
+    """Compressed copy of an uploaded source's SQLite file (and Tally metadata).
+
+    Render's disk is wiped on every restart, so the database keeps the file and
+    the app writes it back to disk when it is missing. One row per workspace;
+    it is removed with the workspace (and with the organization).
+    """
+
+    __tablename__ = "workspace_source_blobs"
+
+    workspace_id: Mapped[str] = mapped_column(ForeignKey("workspace_records.id", ondelete="CASCADE"), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True, nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    report_metadata: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
+    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False)
 
 
 class WorkspaceGuardrail(Base):

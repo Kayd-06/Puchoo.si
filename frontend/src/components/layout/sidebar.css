@@ -29,3 +29,31 @@
     min-height: 44px;
   }
 }
+
+/* Name on the first line, an optional "Needs re-upload" tag under it. */
+.app-sidebar .workspace-picker-label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.app-sidebar .workspace-picker-label > span:first-child {
+  max-width: 100%;
+}
+
+.app-sidebar .workspace-picker-label .source-needs-reupload-tag {
+  overflow: visible;
+  padding: 1px 7px;
+  font-size: 0.66rem;
+}
+
+/* How many files a company holds, under its name in the picker. */
+.app-sidebar .workspace-picker-label .workspace-picker-count {
+  overflow: visible;
+  color: color-mix(in srgb, currentColor 62%, transparent);
+  font-size: 0.68rem;
+  letter-spacing: 0.01em;
+}

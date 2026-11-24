@@ -44,6 +44,7 @@ def _positive_int(name: str, default: int) -> int:
     return value if value > 0 else default
 
 
+UPLOAD_MAX_FILES_CEILING = 10
 DEFAULT_SESSION_SECRET = "dev-secret-key-do-not-use-in-prod"
 DEFAULT_OTP_SECRET = "dev-otp-secret-do-not-use-in-prod"
 # Values that ship with the repo. Production must replace both secrets.
@@ -161,7 +162,8 @@ def load_settings() -> Settings:
         smtp_use_tls=_as_bool(os.getenv("SMTP_USE_TLS"), default=True),
         smtp_use_ssl=_as_bool(os.getenv("SMTP_USE_SSL"), default=False),
         upload_max_bytes=_positive_int("UPLOAD_MAX_BYTES", 25 * 1024 * 1024),
-        upload_max_files=_positive_int("UPLOAD_MAX_FILES", 10),
+        # One batch holds at most 10 files; the setting can lower this, not raise it.
+        upload_max_files=min(_positive_int("UPLOAD_MAX_FILES", UPLOAD_MAX_FILES_CEILING), UPLOAD_MAX_FILES_CEILING),
         auth_rate_limit=_positive_int("AUTH_RATE_LIMIT", 5),
         auth_rate_window_seconds=_positive_int("AUTH_RATE_WINDOW_SECONDS", 15 * 60),
         auth_backoff_base_seconds=_positive_int("AUTH_BACKOFF_BASE_SECONDS", 60),

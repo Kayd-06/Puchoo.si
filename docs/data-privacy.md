@@ -19,8 +19,21 @@ stored, because memory is sent back to the model as context.
 
 Categorical hints read real values, so they are filtered: a value with a digit,
 an email, or more than 40 characters is dropped, and tables imported from
-financial reports (Tally) never get hints. `PUCHOO_SCHEMA_VALUE_HINTS=0` turns
+financial reports (Tally) never get hints. Once a company holds any Tally
+report, none of its tables get hints. `PUCHOO_SCHEMA_VALUE_HINTS=0` turns
 hints off everywhere.
+
+Table names are part of the schema, so they are sent with every question. A
+Tally report's table is named after the report type (for example
+`sales_register`), not after the file or the company. When you name a table
+yourself, keep company and party names out of it. The friendly file name you
+see in Settings, the original file name and the report header stay on the
+server.
+
+When a company has many tables (more than `PUCHOO_SCHEMA_FOCUS_AFTER_TABLES`,
+5 by default), only the tables that match the question are sent (at most
+`PUCHOO_SCHEMA_FOCUS_MAX_TABLES`, 6 by default). If nothing matches, every
+table is sent as before.
 
 ## Logs
 
@@ -33,11 +46,69 @@ Every log record is scrubbed when it is created, before any handler prints it:
 - the query pipeline logs route, table names, counts and SQL with literals
   removed. It does not log the question, rows or repair feedback.
 
+## Where uploaded data is stored
+
+An upload is turned into a SQLite file on the server's disk. Render's free plan
+wipes that disk on every restart or redeploy, so the app also keeps a
+compressed (zlib) copy of that SQLite file in the app database (the
+`workspace_source_blobs` table in Neon Postgres). The small metadata file next
+to it (the list of files in a company, their labels and periods, and any Tally
+report headers) is kept with it. The copy is refreshed every time a file is
+added, replaced or removed, and when another source is moved into the company. When the file is missing on disk, the app
+writes it back from this copy before answering. A copy can only be restored for
+the same source and the same organization it was saved for. The copy is never
+sent to any outside service, and its contents are never logged (only the
+source id and byte counts).
+
+Copies larger than 50 MiB after compression are not kept (change this with
+`PUCHOO_SOURCE_BLOB_MAX_BYTES`). Such a source works until the next restart and
+then shows "Needs re-upload". A source wiped before this copy existed also
+shows "Needs re-upload"; uploading the file again keeps the same source, its
+name, history and settings.
+
+Re-upload replaces the whole SQLite file, so it only runs when that can't lose
+anything: the file is gone and there is no copy to restore, or the source has a
+single table. A company that still has several files is never re-uploaded (the
+server answers 409 `company_has_files`); add files to it, or replace one file
+in Settings. For a wiped company with no copy, re-upload one of its files to
+bring it back, then add the others from Data sources.
+
+Database backups (`backend/backups.py`) include these copies, because they are
+part of the database.
+
+## Companies with many files
+
+A company is one data source with one table per file. Adding a file to a
+company, replacing one file or removing one file changes that company's SQLite
+file in a temporary copy first; the live file is swapped only when the change
+succeeded, so a failed upload leaves the company as it was. Removing or
+replacing a file also clears pending queries and cached schema and translations
+for that company. Only owners and admins can add, replace, remove or move
+files; editors can see the files list.
+
+Several files (up to 10) can be chosen at once. The browser keeps the files and
+sends each one to the preview, so every file gets the same size, type and role
+checks as a single upload and nothing is written before Save. On Save each kept
+file is sent on its own: the first one creates the company (or goes into the
+chosen one) and the rest are added to that company. Each file is its own
+atomic change, so one failing file is reported and the others are still saved,
+and the database copy is refreshed after every file. Adding files never deletes
+or replaces a table that is already there: the same Tally report for a new
+period adds rows (saved vouchers are skipped), ledgers and other reports get
+their own table, and a name that is already taken is refused for that file.
+
+"Move into company" copies every table of another uploaded source in the same
+organization into this company, then deletes the old source the same way as
+"Deleting an upload" below (stored file, sidecar, database copy, pending
+queries, cached translations and its conversation memory). Its question
+history is moved to the company. Database (server) connections cannot be moved.
+
 ## Deleting an upload
 
 Only the workspace owner can delete a data source (admins can still upload and
 connect sources). That removes the stored SQLite file and its journal files, the report metadata
-sidecar, the workspace row and its history (cascade), pending queries, its
+sidecar, the copy of the file kept in the database, the workspace row and its
+history (cascade), pending queries, its
 notifications, cached translations, and schedules removal of its conversation
 memory. The original uploaded file is never written to disk; it is parsed in
 memory.
@@ -45,7 +116,8 @@ memory.
 The owner of a business or school can also delete the whole organization from
 Settings. That needs the exact organization name and the owner's current
 password, is rate limited, and removes every account, session, invite, source
-and its derived state, including cached translations. The only log line is
+and its derived state, including the file copies kept in the database and
+cached translations. The only log line is
 `organization_deleted` with the tenant id and the number of accounts removed.
 
 ## Real data and git

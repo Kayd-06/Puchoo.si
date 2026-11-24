@@ -46,6 +46,15 @@ export function AppProvider({ children }) {
     setWorkspaces((current) => [...current.filter((item) => item.id !== workspace.id), workspace]);
   }, []);
 
+  // Replace a source in place (same id), e.g. after a re-upload, without reordering.
+  const updateWorkspace = useCallback((workspace) => {
+    if (!workspace?.id) return;
+    workspaceRequest.current += 1;
+    setWorkspaces((current) =>
+      current.map((item) => (item.id === workspace.id ? { ...item, ...workspace } : item)),
+    );
+  }, []);
+
   const removeWorkspace = useCallback(
     (workspaceId) => {
       workspaceRequest.current += 1;
@@ -114,6 +123,7 @@ export function AppProvider({ children }) {
     workspaces,
     setWorkspaces,
     addWorkspace,
+    updateWorkspace,
     removeWorkspace,
     activeWorkspaceId,
     setActiveWorkspaceId,

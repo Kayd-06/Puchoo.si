@@ -131,6 +131,7 @@ class SessionManager:
             with database.SessionLocal() as db:
                 repository = WorkspaceRepository(db)
                 workspaces = repository.list_for_tenant(tenant_id)
+                db.commit()  # Saves a source path moved by a restore; no-op otherwise.
                 guardrails = {
                     workspace["id"]: repository.get_guardrails(workspace["id"])
                     for workspace in workspaces if workspace["id"] not in known_guardrails
@@ -182,9 +183,31 @@ class SessionManager:
     def get_history(self, workspace_id):
         return deepcopy(self.query_history.get(workspace_id, []))
 
+    @staticmethod
+    def _managed_file(workspace):
+        """The upload file Puchoo.si owns for a cached source, or None."""
+        from pathlib import Path
+        from apps.core.workspaces import workspace_source_file
+        if workspace.get("source_type") == "server":
+            return None
+        uri = workspace.get("database_uri")
+        if not uri and workspace.get("source_ref"):
+            uri = f"sqlite:///{Path(str(workspace['source_ref'])).expanduser()}"
+        return workspace_source_file(uri)
+
+    def _store_source_copy(self, db, workspace):
+        from backend.source_blobs import store_source
+        source = self._managed_file(workspace)
+        tenant_id = workspace.get("owner_user_id")
+        if source is None or not tenant_id:
+            return None
+        return store_source(db, workspace_id=str(workspace["id"]), tenant_id=str(tenant_id), database_file=source)
+
     def add_workspace(self, workspace):
         ws_id = workspace["id"]
-        with self._edit(ws_id):
+        def action(db):
+            self._store_source_copy(db, workspace)
+        with self._edit(ws_id, action):
             if ws_id in self.workspaces:
                 raise ValueError("Workspace already exists")
             self.workspaces[ws_id] = dict(workspace)
@@ -250,6 +273,7 @@ class SessionManager:
         from sqlalchemy import delete
         from backend.models import Notification, PendingQuery, WorkspaceRecord
         from backend.memory_deletions import enqueue
+        from backend.source_blobs import delete_source
         removed = None
         def action(db):
             record = db.get(WorkspaceRecord, workspace_id)
@@ -260,6 +284,7 @@ class SessionManager:
                 db.execute(delete(PendingQuery).where(
                     PendingQuery.workspace_id == workspace_id, PendingQuery.tenant_id == record.tenant_id))
                 db.execute(delete(Notification).where(Notification.resource_id == workspace_id))
+                delete_source(db, workspace_id)
                 db.delete(record)
         with self._edit(db_action=action):
             removed = self.workspaces.pop(workspace_id, None)
@@ -279,6 +304,226 @@ class SessionManager:
                 from apps.core.workspaces import delete_workspace_files
                 delete_workspace_files(uri)
 
+    def persist_source(self, workspace_id, tenant_id):
+        """Refresh the durable copy after a source file changed in place (Tally append)."""
+        from backend import database
+        workspace = self.get_workspace(workspace_id)
+        if not workspace or workspace.get("owner_user_id") != tenant_id:
+            return None
+        with database.SessionLocal() as db:
+            result = self._store_source_copy(db, workspace)
+            db.commit()
+        return result
+
+    def source_changed(self, workspace_id, tenant_id, *, drop_pending=False):
+        """A file was added to, removed from or replaced in a company.
+
+        Refreshes the durable copy in the same commit, then drops everything
+        derived from the old tables: the schema cache, any open proposal and
+        cached translations. ``drop_pending`` also removes stored proposals,
+        which can hold literals from data that was just removed.
+        Raises if the copy could not be saved so the caller can undo the file.
+        """
+        from sqlalchemy import delete
+        from backend.models import PendingQuery
+
+        workspace = self.get_workspace(workspace_id)
+        if not workspace or workspace.get("owner_user_id") != tenant_id:
+            raise ValueError("Workspace not found")
+        stored = {}
+
+        def action(db):
+            result = self._store_source_copy(db, workspace)
+            stored["durable"] = bool(result and result.stored)
+            if drop_pending:
+                db.execute(delete(PendingQuery).where(
+                    PendingQuery.workspace_id == workspace_id, PendingQuery.tenant_id == tenant_id))
+
+        with self._edit(workspace_id, action):
+            if workspace_id not in self.workspaces:
+                raise ValueError("Workspace was removed")
+            self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+            self.active_proposals.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(tenant_id)
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        return stored.get("durable", False)
+
+    def absorb_source(self, target_id, source_id, tenant_id, *, source_name=None):
+        """Finish moving one data source into a company, in one database commit.
+
+        The target's file already holds the moved tables. This saves its
+        durable copy, moves the source's question history over, and removes
+        the source the same way a delete does (pending proposals, notices,
+        stored copy, memory). The source's own file is deleted after commit.
+        """
+        from sqlalchemy import delete
+        from backend import database
+        from backend.models import Notification, PendingQuery, WorkspaceRecord
+        from backend.memory_deletions import enqueue, generation
+        from backend.source_blobs import delete_source
+
+        target = self.get_workspace(target_id)
+        source = self.get_workspace(source_id)
+        if (not target or not source or target_id == source_id
+                or target.get("owner_user_id") != tenant_id or source.get("owner_user_id") != tenant_id):
+            raise ValueError("Workspace not found")
+        with database.SessionLocal() as db:
+            target_generation = generation(db, tenant_id, target_id)
+
+        def action(db):
+            self._store_source_copy(db, self.workspaces[target_id])
+            record = db.get(WorkspaceRecord, source_id)
+            if record is None or record.tenant_id != tenant_id:
+                raise ValueError("Workspace not found")
+            enqueue(db, tenant_id, source_id)
+            db.execute(delete(PendingQuery).where(
+                PendingQuery.workspace_id == source_id, PendingQuery.tenant_id == tenant_id))
+            db.execute(delete(Notification).where(Notification.resource_id == source_id))
+            delete_source(db, source_id)
+            db.delete(record)
+
+        moved = 0
+        with self._edit(target_id, action):
+            if target_id not in self.workspaces or source_id not in self.workspaces:
+                raise ValueError("Workspace was removed")
+            existing_ids = {str(item.get("id")) for item in self.query_history.get(target_id, [])}
+            carried = []
+            for item in self.query_history.get(source_id, []):
+                if str(item.get("id")) in existing_ids:
+                    continue
+                entry = deepcopy(item)
+                entry["memory_generation"] = target_generation
+                entry["moved_from"] = source_name or source.get("name")
+                carried.append(entry)
+            combined = self.query_history.get(target_id, []) + carried
+            combined.sort(key=lambda item: str(item.get("created_at") or ""), reverse=True)
+            self.query_history[target_id] = combined
+            moved = len(carried)
+            removed = self.workspaces.pop(source_id, None)
+            self.workspace_guardrails.pop(source_id, None)
+            self.query_history.pop(source_id, None)
+            for workspace_id in (source_id, target_id):
+                self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+                self.active_proposals.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(tenant_id)
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        uri = removed.get("database_uri") if isinstance(removed, dict) else None
+        if not uri and isinstance(removed, dict) and removed.get("source_ref"):
+            uri = f"sqlite:///{removed['source_ref']}"
+        with STATE_LOCK:
+            if uri and not any(ws.get("database_uri") == uri for ws in self.workspaces.values()):
+                from apps.core.workspaces import delete_workspace_files
+                delete_workspace_files(uri)
+        return moved
+
+    def ensure_source_on_disk(self, workspace_id, tenant_id):
+        """Bring back a wiped upload from its database copy before it is used.
+
+        Returns the (possibly refreshed) cached workspace. Only the caller's own
+        tenant row is read, so another tenant's copy can never be restored.
+        """
+        from pathlib import Path
+        from sqlalchemy import select
+        from backend import database
+        from backend.models import WorkspaceRecord
+        from sqlalchemy.exc import SQLAlchemyError
+        from backend.source_blobs import restore_source
+        from backend.workspace_repository import WorkspaceRepository
+
+        workspace = self.get_workspace(workspace_id)
+        if not workspace or workspace.get("owner_user_id") != tenant_id or workspace.get("source_type") == "server":
+            return workspace
+        source_ref = workspace.get("source_ref") or str(workspace.get("database_uri") or "").removeprefix("sqlite:///")
+        if workspace.get("availability") != "unavailable" and source_ref and Path(source_ref).expanduser().is_file():
+            return workspace
+        try:
+            with database.SessionLocal() as db:
+                record = db.scalar(select(WorkspaceRecord).where(
+                    WorkspaceRecord.id == workspace_id, WorkspaceRecord.tenant_id == tenant_id))
+                if record is None:
+                    return workspace
+                if restore_source(db, record) is None:
+                    return self._mark_unavailable(workspace_id, tenant_id) or workspace
+                db.commit()
+                restored = WorkspaceRepository._as_dict(record)
+        except (SQLAlchemyError, OSError):
+            logger.warning("source_restore_lookup_failed", exc_info=True)
+            return workspace
+        with STATE_LOCK:
+            cached = self.workspaces.get(workspace_id)
+            if cached is not None and cached.get("owner_user_id") == tenant_id:
+                for key in ("source_ref", "database_uri", "availability"):
+                    if key in restored:
+                        cached[key] = restored[key]
+            return dict(cached) if cached is not None else None
+
+    def _mark_unavailable(self, workspace_id, tenant_id):
+        """The file is gone and there is no copy: say so instead of opening an empty file."""
+        with STATE_LOCK:
+            cached = self.workspaces.get(workspace_id)
+            if cached is None or cached.get("owner_user_id") != tenant_id:
+                return None
+            cached["availability"] = "unavailable"
+            cached.pop("database_uri", None)
+            return dict(cached)
+
+    def replace_source(self, workspace_id, tenant_id, replacement):
+        """Point an existing source at a newly uploaded file, keeping its id.
+
+        Name, guardrails and history stay; the schema cache and any open
+        proposal are dropped because the tables may have changed.
+        """
+        from backend.workspace_repository import SAFE_METADATA_KEYS
+        new_uri = replacement["database_uri"]
+        new_path = new_uri.removeprefix("sqlite:///")
+        previous = {}
+
+        def action(db):
+            stored = self._store_source_copy(db, self.workspaces[workspace_id])
+            previous["stored"] = bool(stored and stored.stored)
+
+        with self._edit(workspace_id, action):
+            workspace = self.workspaces.get(workspace_id)
+            if not workspace or workspace.get("owner_user_id") != tenant_id:
+                raise ValueError("Workspace not found")
+            if workspace.get("source_type") == "server":
+                raise ValueError("Server connections are reconnected, not re-uploaded")
+            previous["file"] = self._managed_file(workspace)
+            updated = {key: value for key, value in workspace.items()
+                       if key not in SAFE_METADATA_KEYS and key != "connect_args"}
+            updated.update(
+                database_uri=new_uri,
+                source_ref=new_path,
+                dialect=replacement.get("dialect", "sqlite"),
+                source_type=replacement.get("source_type", workspace.get("source_type")),
+                availability="available",
+            )
+            self.workspaces[workspace_id] = updated
+            self.schema_snapshots.pop(f"schema_{workspace_id}", None)
+            self.active_proposals.pop(workspace_id, None)
+            self._invalidate_tenant_refresh(tenant_id)
+        try:
+            from apps.api.routers.query import clear_translation_cache
+            clear_translation_cache()
+        except ImportError:
+            pass
+        old_file = previous.get("file")
+        if old_file is not None and str(old_file) != str(new_path):
+            with STATE_LOCK:
+                old_uri = f"sqlite:///{old_file}"
+                if not any(ws.get("database_uri") == old_uri for ws in self.workspaces.values()):
+                    from apps.core.workspaces import delete_workspace_files
+                    delete_workspace_files(old_uri)
+        return {**self.get_workspace(workspace_id), "durable": previous.get("stored", False)}
+
     @serialized
     def remove_organization(self, tenant_id):
         """Commit account/source deletion together, then discard derived local state."""
@@ -286,6 +531,7 @@ class SessionManager:
         from backend import database
         from backend.models import User, WorkspaceRecord
         from backend.memory_deletions import enqueue
+        from backend.source_blobs import delete_tenant_sources
         from apps.core.workspaces import delete_workspace_files
 
         uris = set()
@@ -295,6 +541,8 @@ class SessionManager:
                 enqueue(db, tenant_id, record.id)
                 if record.source_type != "server" and record.source_ref:
                     uris.add(f"sqlite:///{record.source_ref}")
+            # Stored file copies go with the organization (the FK cascade does too).
+            delete_tenant_sources(db, tenant_id)
             # Match the canonical tenant policy, including legacy institution members.
             removed_accounts = db.execute(delete(User).where(func.coalesce(
                 User.workspace_owner_id, User.institute_owner_id, User.id,
@@ -340,6 +588,7 @@ class SessionManager:
         from backend import database
         from backend.models import WorkspaceRecord, Tenant, PersistenceMarker
         from backend.workspace_repository import WorkspaceRepository, import_legacy_local_state
+        from backend.source_blobs import has_source
         with database.SessionLocal() as db:
             if db.get(PersistenceMarker, "relational-authority-v1") is None:
                 # Any existing tenant state is authoritative, including zero remaining workspaces.
@@ -351,10 +600,16 @@ class SessionManager:
             runtime = self.workspaces
             workspaces, guardrails, history = {}, {}, {}
             for record in db.scalars(select(WorkspaceRecord)).all():
-                workspace = repository._as_dict(record)
+                # Restores an upload wiped by a restart from its database copy.
+                workspace = repository.resolve(record)
+                if workspace.get("availability") == "available" and not has_source(
+                        db, workspace_id=record.id, tenant_id=record.tenant_id):
+                    # Sources uploaded before durable copies existed get one now.
+                    self._store_source_copy(db, workspace)
                 workspaces[record.id] = self._keep_runtime_credentials(workspace, runtime.get(record.id, {}))
                 guardrails[record.id] = {**self.DEFAULT_GUARDRAILS, **repository.get_guardrails(record.id)}
                 history[record.id] = repository.get_history(record.id)
+            db.commit()
             self.workspaces, self.workspace_guardrails, self.query_history = workspaces, guardrails, history
             self._invalidate_tenant_refresh()
 

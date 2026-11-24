@@ -1,0 +1,286 @@
+/* Several files checked together before saving (Connect Data). */
+#root .app-container .connect-page.is-batch .connect-stage-content {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  width: min(100%, 980px);
+}
+
+#root .app-container .connect-page.is-batch .connect-intro {
+  display: none;
+}
+
+.batch-import,
+.batch-results {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  pointer-events: auto;
+}
+
+.batch-import-header h2,
+.batch-results h2 {
+  margin: 8px 0 4px;
+  color: var(--tp-text);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.batch-import-header p,
+.batch-results-summary {
+  margin: 0;
+  color: var(--tp-muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.batch-company {
+  margin: 0;
+}
+
+.batch-card-list,
+.batch-result-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.batch-card.tally-preview {
+  min-width: 0;
+  margin: 0;
+  width: 100%;
+}
+
+.batch-card-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--tp-line);
+  color: var(--tp-text);
+  font-size: 0.8rem;
+}
+
+.batch-card-bar strong {
+  min-width: 0;
+  flex: 1 1 140px;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.batch-card-index {
+  border-radius: 999px;
+  background: var(--tp-select);
+  padding: 2px 8px;
+  color: var(--tp-muted);
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.batch-card-size {
+  color: var(--tp-muted);
+  font-size: 0.72rem;
+}
+
+.batch-card-remove,
+.batch-card-undo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  border: 1px solid var(--tp-line);
+  border-radius: 8px;
+  background: transparent;
+  padding: 4px 10px;
+  color: var(--tp-text);
+  font: inherit;
+  font-size: 0.74rem;
+  cursor: pointer;
+}
+
+.batch-card-remove {
+  border-color: color-mix(in srgb, var(--tp-bad-fg) 40%, var(--tp-line));
+  color: var(--tp-bad-fg);
+}
+
+.batch-card-remove:disabled,
+.batch-card-undo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.batch-card.is-cancelled {
+  border: 1px dashed var(--tp-line);
+  border-radius: 14px;
+  padding: 10px 14px;
+  background: transparent;
+  opacity: 0.85;
+}
+
+.batch-card.is-cancelled .batch-card-bar {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.batch-card.is-cancelled strong {
+  text-decoration: line-through;
+  color: var(--tp-muted);
+}
+
+.batch-card-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--tp-muted);
+  font-size: 0.74rem;
+}
+
+.batch-card-loading,
+.batch-card-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 6px 0;
+  color: var(--tp-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.batch-card-error {
+  border-radius: 10px;
+  background: var(--tp-bad-bg);
+  padding: 10px 12px;
+  color: var(--tp-bad-fg);
+}
+
+.batch-card-destination {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.batch-card-mismatch {
+  cursor: pointer;
+}
+
+.batch-card-mismatch > span {
+  display: grid;
+  gap: 6px;
+}
+
+.batch-card-mismatch-copy {
+  color: var(--tp-text);
+  line-height: 1.5;
+}
+
+.batch-card-mismatch-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--tp-text);
+  font-weight: 600;
+}
+
+.batch-plain-facts {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.batch-import-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--tp-line);
+  border-radius: 14px;
+  background: var(--tp-surface);
+  padding: 12px 14px;
+  box-shadow: 0 -12px 28px rgb(0 0 0 / 0.28);
+}
+
+.batch-import-footer p {
+  margin: 0;
+  color: var(--tp-text);
+  font-size: 0.8rem;
+}
+
+.batch-import-footer .tally-preview-actions {
+  margin: 0;
+}
+
+.batch-result {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--tp-line);
+  border-radius: 12px;
+  background: var(--tp-raised);
+  padding: 10px 12px;
+  color: var(--tp-text);
+  font-size: 0.8rem;
+}
+
+.batch-result > div {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.batch-result strong {
+  overflow-wrap: anywhere;
+}
+
+.batch-result span {
+  color: var(--tp-muted);
+  line-height: 1.45;
+}
+
+.batch-result.is-added > svg {
+  color: var(--tp-ok-fg);
+}
+
+.batch-result.is-failed > svg,
+.batch-result.is-needs_confirmation > svg {
+  color: var(--tp-warn-fg);
+}
+
+.batch-result.is-cancelled {
+  border-style: dashed;
+  opacity: 0.8;
+}
+
+.batch-results-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.batch-import .company-picker :is(select, input) {
+  min-height: 38px;
+  border: 1px solid var(--tp-line);
+  border-radius: 9px;
+  background: var(--tp-raised);
+  color: var(--tp-text);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 0.84rem;
+}
+
+.batch-import .company-picker label > span {
+  color: var(--tp-muted);
+}
+
+.batch-import-footer .tally-preview-cancel {
+  white-space: nowrap;
+}

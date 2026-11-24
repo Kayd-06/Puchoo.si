@@ -13,6 +13,8 @@ import {
 import { useAppContext } from '../../context/AppContext';
 import { useAuth } from '../../context/AuthContext';
 import { can } from '../../auth/capabilities';
+import { NEEDS_REUPLOAD_LABEL, needsReupload } from '../workspace/ReuploadSourceNotice';
+import { fileCountLabel } from '../connect/CompanyPicker';
 import './sidebar.css';
 
 const NAV_ITEMS = [
@@ -155,7 +157,7 @@ export default function Sidebar({ onNavigate }) {
       </nav>
 
       <div className="app-sidebar-bottom">
-        <div className="app-sidebar-section-label">Active data source</div>
+        <div className="app-sidebar-section-label">Company / data source</div>
         {workspaces.length ? (
           <div
             ref={pickerRef}
@@ -172,8 +174,18 @@ export default function Sidebar({ onNavigate }) {
               onClick={togglePicker}
             >
               <span className="workspace-picker-dot" aria-hidden="true" />
-              <span className="workspace-picker-value">
-                {selectedWorkspace?.name || 'Select data source'}
+              <span className="workspace-picker-label">
+                <span className="workspace-picker-value">
+                  {selectedWorkspace?.name || 'Select data source'}
+                </span>
+                {selectedWorkspace?.file_count > 0 && (
+                  <span className="workspace-picker-count">
+                    {fileCountLabel(selectedWorkspace.file_count)}
+                  </span>
+                )}
+                {needsReupload(selectedWorkspace) && (
+                  <span className="source-needs-reupload-tag">{NEEDS_REUPLOAD_LABEL}</span>
+                )}
               </span>
               <ChevronDown className="workspace-picker-chevron" size={16} aria-hidden="true" />
             </button>
@@ -210,7 +222,17 @@ export default function Sidebar({ onNavigate }) {
                       onClick={() => chooseWorkspace(workspace.id)}
                     >
                       <Database size={14} aria-hidden="true" />
-                      <span>{workspace.name}</span>
+                      <span className="workspace-picker-label">
+                        <span>{workspace.name}</span>
+                        {workspace.file_count > 0 && (
+                          <span className="workspace-picker-count">
+                            {fileCountLabel(workspace.file_count)}
+                          </span>
+                        )}
+                        {needsReupload(workspace) && (
+                          <span className="source-needs-reupload-tag">{NEEDS_REUPLOAD_LABEL}</span>
+                        )}
+                      </span>
                       {selected && <Check size={14} aria-hidden="true" />}
                     </button>
                   );
