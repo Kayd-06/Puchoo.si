@@ -1067,9 +1067,9 @@ html[data-theme='light'] #root .app-container .history-page-clean .history-clear
   color: #727568;
 }
 
-/* Keep the particle field visible without the stark contrast of black on white. */
+/* The light renderer owns per-pixel contrast; avoid fading its whole canvas again. */
 html[data-theme='light'] #root .app-container .ask-page .ask-universe {
-  opacity: 0.62;
+  opacity: 1;
 }
 html[data-theme='light'] #root .theme-switch.is-light .theme-switch-thumb {
   background: #faf9f6;

@@ -50,6 +50,9 @@ it.each(['enter', 'click'])(
     expect(status).toHaveTextContent('Calculating');
     expect(container.querySelector('.ask-prompt-actions').lastElementChild).toBe(status);
     expect(status.closest('.ask-prompt-controls')).not.toBeNull();
+    expect(container.querySelector('.ask-query-transition')).toBeInTheDocument();
+    expect(container.querySelector('.ask-generation-sheet')).toBeInTheDocument();
+    expect(container.querySelectorAll('.ask-generation-row')).toHaveLength(8);
     expect(screen.queryByRole('button', { name: 'Run secure query' })).not.toBeInTheDocument();
     expect(fetchApi).toHaveBeenCalledTimes(1);
     finish({ status: 'answer_unavailable', message: 'No revenue data is available.' });
@@ -57,6 +60,7 @@ it.each(['enter', 'click'])(
       expect(screen.queryByRole('status', { name: 'Calculating answer' })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole('button', { name: 'Run secure query' })).toBeEnabled();
+    expect(container.querySelector('.ask-query-transition')).not.toBeInTheDocument();
   },
 );
 it('stops the animation on request failure and allows retry', async () => {

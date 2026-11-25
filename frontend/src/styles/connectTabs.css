@@ -1,25 +1,25 @@
 /* Scoped geometry keeps the source workflow independent of legacy page styles. */
 #root .app-container .connect-page {
-  --source-bg: #111210;
-  --source-panel: #191b18;
-  --source-input: #121410;
-  --source-line: #383c33;
-  --source-text: #f0f1e9;
-  --source-muted: #a4ab9c;
-  --source-accent: #d8e7bd;
-  --source-on-accent: #243019;
+  --source-bg: #0d0d0d;
+  --source-panel: #111111;
+  --source-input: #101010;
+  --source-line: #303030;
+  --source-text: #f2f2f2;
+  --source-muted: #a3a3a3;
+  --source-accent: #ebebeb;
+  --source-on-accent: #1a1a1a;
   min-height: 0;
   background: var(--source-bg);
   color: var(--source-text);
 }
 html[data-theme='light'] #root .app-container .connect-page {
-  --source-bg: #eeede9;
+  --source-bg: #f6f6f6;
   --source-panel: #ffffff;
-  --source-input: #eeede9;
-  --source-line: #d4d0c7;
-  --source-text: #22251c;
-  --source-muted: #66695a;
-  --source-accent: #292925;
+  --source-input: #f6f6f6;
+  --source-line: #dddddd;
+  --source-text: #202020;
+  --source-muted: #666666;
+  --source-accent: #292929;
   --source-on-accent: #ffffff;
 }
 #root .app-container .connect-page .connect-stage {
@@ -179,21 +179,26 @@ html[data-theme='light'] #root .app-container .connect-page {
   font: 400 12px/1.6 var(--font-sans);
 }
 #root .app-container .connect-page .connect-dropzone {
-  min-height: 160px;
-  margin-top: 20px;
-  padding: 16px;
-  border: 1px dashed var(--source-line);
-  border-radius: 12px;
+  min-height: 400px;
+  margin-top: 0;
+  padding: 30px 18px 36px;
+  gap: 0;
+  border: 1px solid color-mix(in srgb, var(--source-line) 55%, transparent);
+  border-radius: 32px;
   background: var(--source-input);
   color: var(--source-text);
-  box-shadow: none;
+  box-shadow:
+    0 0 20px #ffffff03,
+    inset 0 1px 0 #ffffff03;
   transform: none;
 }
 #root .app-container .connect-page .connect-dropzone::before {
   display: none;
 }
 #root .app-container .connect-page .connect-dropzone:is(:hover, .is-dragging, .is-uploading) {
-  border-color: var(--source-accent);
+  border-color: color-mix(in srgb, var(--source-accent) 28%, var(--source-line));
+  background: var(--source-input);
+  box-shadow: 0 0 25px #ffffff05;
 }
 #root .app-container .connect-page .connect-dropzone-mark {
   border-color: var(--source-line);
@@ -405,9 +410,8 @@ html[data-theme='light'] #root .app-container .connect-page p.connect-error {
     .connect-page
     .connect-upload-flow:has(.connect-selected-files)
     .connect-dropzone {
-    min-height: 100px;
-    gap: 5px;
-    padding: 10px;
+    min-height: 330px;
+    padding: 14px 18px 24px;
   }
   #root .app-container .connect-page .connect-selected-files > div {
     max-height: 64px;
@@ -546,6 +550,195 @@ html[data-theme='light'] #root .app-container .connect-page p.connect-error {
   #root .app-container .connect-page .connect-signal-word {
     animation: none;
     background: none;
+  }
+}
+
+/* Noire upload composition. Material and motion stay inside the interaction card. */
+#root .app-container .connect-page .connect-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+#root .app-container .connect-page .connect-upload-title {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 14px 0 20px;
+  font: 600 23px/1.25 var(--font-sans);
+  letter-spacing: -0.025em;
+  color: var(--source-text);
+}
+#root .app-container .connect-page .connect-dropzone > span {
+  max-width: 420px;
+  font: 400 15px/1.5 var(--font-sans);
+  text-align: center;
+}
+#root .app-container .connect-page .connect-dropzone-description b {
+  color: var(--source-text);
+  font-weight: 500;
+}
+#root .app-container .connect-page .connect-upload-flow > .connect-upload-note {
+  margin-top: 12px;
+  font-size: 11px;
+  text-align: center;
+}
+#root
+  .app-container
+  .connect-page
+  .connect-upload-flow
+  > .connect-upload-note
+  + .connect-upload-note {
+  margin-top: 4px;
+}
+#root .app-container .connect-page .is-uploading .connect-dropzone-formats {
+  visibility: hidden;
+}
+#root .app-container .connect-page .connect-upload-spinner {
+  flex-shrink: 0;
+  animation: connect-upload-spin 1s linear infinite;
+}
+#root .app-container .connect-page .connect-selected-files > div > span {
+  background: var(--source-input);
+}
+#root .app-container .connect-page .connect-tablist button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+#root .app-container .connect-page .connect-complete {
+  padding: 20px 18px 28px;
+  text-align: center;
+  border: 1px solid var(--source-line);
+  border-radius: 32px;
+  background: var(--source-input);
+  animation: connect-complete-arrive 0.55s ease-out both;
+}
+#root .app-container .connect-page .connect-complete > .connect-complete-art {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  height: auto;
+  margin: 0 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+#root .app-container .connect-page .connect-complete > .connect-complete-name {
+  color: var(--source-text);
+  overflow-wrap: anywhere;
+}
+#root .app-container .connect-page .connect-complete > p {
+  max-width: 420px;
+  margin-inline: auto;
+}
+#root .app-container .connect-page .connect-complete a {
+  background: var(--source-accent);
+  color: var(--source-on-accent) !important;
+  border: 0;
+}
+#root .app-container .connect-page .connect-complete > button {
+  margin-inline: auto;
+}
+#root .app-container .connect-page .connect-server-art {
+  display: flex;
+  justify-content: center;
+  height: 118px;
+  margin: -14px 0 12px;
+  overflow: hidden;
+}
+#root .app-container .connect-page .connect-server-art .source-illustration {
+  width: 190px;
+  height: 145px;
+}
+/* The same neutral palette extends through import review. */
+#root .app-container .connect-page .tally-preview {
+  --tp-surface: var(--source-input);
+  --tp-raised: var(--source-panel);
+  --tp-line: var(--source-line);
+  --tp-text: var(--source-text);
+  --tp-muted: var(--source-muted);
+  --tp-accent: var(--source-accent);
+  --tp-ok-bg: var(--source-panel);
+  --tp-ok-fg: var(--source-text);
+  --tp-select: color-mix(in srgb, var(--source-accent) 12%, var(--source-panel));
+}
+/* DATA and LINK have a slow light pass and a distinct arrival on tab change. */
+#root .app-container .connect-page .connect-signal-word {
+  animation:
+    connect-word-arrive 0.65s cubic-bezier(0.22, 1, 0.36, 1) both,
+    connect-word-light 4.5s ease-in-out infinite;
+}
+#root .app-container .connect-page .connect-signal[data-state='LINK'] .connect-signal-word {
+  letter-spacing: -0.045em;
+  animation:
+    connect-link-arrive 0.7s cubic-bezier(0.22, 1, 0.36, 1) both,
+    connect-word-light 4.5s ease-in-out infinite;
+}
+@keyframes connect-link-arrive {
+  from {
+    opacity: 0;
+    letter-spacing: 0.08em;
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    letter-spacing: -0.045em;
+    filter: blur(0);
+  }
+}
+@keyframes connect-upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes connect-complete-arrive {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+html[data-theme='light'] #root .app-container .connect-page .connect-dropzone {
+  background: #ffffff;
+  box-shadow:
+    0 4px 18px #00000008,
+    inset 0 1px 0 #ffffff;
+}
+@media (max-width: 760px) {
+  #root .app-container .connect-page .connect-dropzone {
+    min-height: 365px;
+    padding: 20px 14px 30px;
+    border-radius: 26px;
+  }
+  #root .app-container .connect-page .connect-upload-title {
+    font-size: 22px;
+  }
+  #root .app-container .connect-page .connect-dropzone > span {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  #root
+    .app-container
+    .connect-page
+    :is(
+      .connect-signal-word,
+      .connect-signal[data-state='LINK'] .connect-signal-word,
+      .connect-upload-spinner,
+      .connect-complete
+    ) {
+    animation: none;
+    filter: none;
+  }
+  #root .app-container .connect-page .connect-signal-word {
+    background: none;
+    -webkit-text-stroke-color: var(--source-muted);
   }
 }
 

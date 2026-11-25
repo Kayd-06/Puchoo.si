@@ -1,0 +1,277 @@
+/* Shared geometry; each theme supplies its own generation atmosphere. */
+html:is([data-theme='light'], [data-theme='dark']) #root .app-container .ask-page .ask-stage {
+  container-type: inline-size;
+}
+html:is([data-theme='light'], [data-theme='dark'])
+  #root
+  .app-container
+  .ask-page
+  .ask-query-transition {
+  display: block;
+  position: relative;
+  isolation: isolate;
+  width: 100cqw;
+  min-height: clamp(340px, 45vh, 560px);
+  margin: 0 calc(50% - 50cqw);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: clip;
+  mask-image: linear-gradient(transparent, #000 12%, #000 76%, transparent);
+  animation: sheet-preview-enter 0.3s ease-out both;
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-sheet {
+  position: relative;
+  z-index: 1;
+  width: min(100% - 48px, 970px);
+  margin: 30px auto 0;
+  overflow: hidden;
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  text-align: left;
+}
+html:is([data-theme='light'], [data-theme='dark'])
+  :is(.ask-generation-header, .ask-generation-row) {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1.8fr) minmax(0, 1fr) minmax(0, 1fr);
+  min-height: 29px;
+  border-bottom: 1px solid var(--generation-grid, #8e879512);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-header {
+  min-height: 30px;
+  background: transparent;
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-row > span {
+  display: grid;
+  place-items: center;
+  color: var(--generation-index, #d1d1d1);
+  background: transparent;
+  font:
+    400 9px Arial,
+    sans-serif;
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-row > div {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  border-left: 1px solid var(--generation-grid, #8e879510);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-row > div > i,
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-header > i {
+  display: block;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--generation-cell, #8d879526);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-row > div > i {
+  animation: sheet-cell-breathe 2.2s ease-in-out infinite;
+  animation-delay: calc(var(--sheet-row) * 0.09s);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-header > i {
+  align-self: center;
+  width: 45%;
+  margin-left: 14px;
+  background: var(--generation-cell, #8d879526);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-query-transition::before,
+html:is([data-theme='light'], [data-theme='dark'])
+  #root
+  .app-container
+  .ask-page
+  .result-table-scroll::after {
+  content: '';
+  position: absolute;
+  z-index: 0;
+  inset: -15% -10%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 22% 72%, #ff91edab, transparent 55%),
+    radial-gradient(ellipse at 78% 57%, #a486ffb8, transparent 58%),
+    radial-gradient(ellipse at 50% 25%, #a8f7f58c, transparent 60%);
+  filter: blur(35px);
+  animation: sheet-gradient-bloom 3.4s ease-in-out infinite;
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-caption {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  position: relative;
+  z-index: 1;
+  padding: 24px 12px 48px;
+  background: transparent;
+  color: var(--generation-caption, #919191);
+  font: 400 11px/1.4 var(--font-sans);
+}
+html:is([data-theme='light'], [data-theme='dark']) .ask-generation-caption > i {
+  width: 10px;
+  height: 10px;
+  border: 1px solid #e0e0e0;
+  border-top-color: #828282;
+  border-radius: 50%;
+  animation: sheet-caption-spin 1s linear infinite;
+}
+html:is([data-theme='light'], [data-theme='dark'])
+  #root
+  .app-container
+  .ask-page
+  .result-table-scroll {
+  position: relative;
+  isolation: isolate;
+}
+html:is([data-theme='light'], [data-theme='dark'])
+  #root
+  .app-container
+  .ask-page
+  .result-table-scroll::after {
+  bottom: auto;
+  height: 300px;
+  animation: sheet-result-bloom 1.5s ease-out 0.1s both;
+}
+html:is([data-theme='light'], [data-theme='dark'])
+  #root
+  .app-container
+  .ask-page
+  .result-table
+  tbody
+  tr:nth-child(-n + 12) {
+  animation: sheet-row-fill 0.5s ease-out both;
+  animation-delay: calc(var(--result-row) * 0.045s + 0.12s);
+}
+/* Dark mode uses a slower, lateral aurora instead of the light pastel bloom. */
+html[data-theme='dark'] .ask-page {
+  --generation-grid: #c3ceef12;
+  --generation-cell: #bac7e526;
+  --generation-index: #798397;
+  --generation-caption: #aab3c4;
+}
+html[data-theme='dark'] .ask-query-transition::before,
+html[data-theme='dark'] #root .app-container .ask-page .result-table-scroll::after {
+  background:
+    radial-gradient(ellipse 44% 60% at 25% 70%, #567cbe55, transparent 75%),
+    radial-gradient(ellipse 40% 65% at 72% 62%, #8871c64d, transparent 75%),
+    radial-gradient(ellipse 35% 30% at 50% 58%, #d7e2ff26, transparent 80%);
+  filter: blur(42px);
+}
+html[data-theme='dark'] .ask-query-transition::before {
+  animation: sheet-dark-aurora 4.8s ease-in-out infinite;
+}
+html[data-theme='dark'] .ask-generation-caption > i {
+  border-color: #aab3c42e;
+  border-top-color: #d4dced;
+}
+@keyframes sheet-dark-aurora {
+  0% {
+    opacity: 0;
+    transform: translate(-8%, 38%) scale(0.94);
+  }
+  25% {
+    opacity: 0.85;
+  }
+  55% {
+    opacity: 1;
+    transform: translate(5%, -8%) scale(1.08);
+  }
+  80% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-3%, -65%) scale(1.12);
+  }
+}
+@keyframes sheet-preview-enter {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-cell-breathe {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@keyframes sheet-caption-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes sheet-gradient-bloom {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateY(75%);
+  }
+  48% {
+    opacity: 0.95;
+    transform: translateY(18%);
+  }
+  68% {
+    opacity: 0.85;
+    transform: translateY(-30%);
+  }
+  92%,
+  100% {
+    opacity: 0;
+    transform: translateY(-100%);
+  }
+}
+@keyframes sheet-result-bloom {
+  0% {
+    opacity: 0.8;
+    transform: translateY(35%);
+  }
+  55% {
+    opacity: 0.6;
+    transform: translateY(-35%);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-110%);
+  }
+}
+@keyframes sheet-row-fill {
+  from {
+    opacity: 0.15;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:is([data-theme='light'], [data-theme='dark'])
+    #root
+    .app-container
+    .ask-page
+    .ask-query-transition,
+  html:is([data-theme='light'], [data-theme='dark']) .ask-generation-row > div > i,
+  html:is([data-theme='light'], [data-theme='dark']) .ask-generation-caption > i,
+  html:is([data-theme='light'], [data-theme='dark'])
+    #root
+    .app-container
+    .ask-page
+    .result-table
+    tbody
+    tr:nth-child(-n + 12) {
+    animation: none !important;
+    filter: none;
+  }
+  html:is([data-theme='light'], [data-theme='dark']) .ask-query-transition::before,
+  html:is([data-theme='light'], [data-theme='dark'])
+    #root
+    .app-container
+    .ask-page
+    .result-table-scroll::after {
+    display: none;
+    animation: none !important;
+  }
+}

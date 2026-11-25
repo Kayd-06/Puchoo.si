@@ -1,13 +1,22 @@
 import { useState } from 'react';
 import '../styles/connectTabs.css';
 import { Link } from 'react-router-dom';
-import { ArrowUpRight, Check, FileSpreadsheet, Server, ShieldCheck, Upload, X } from 'lucide-react';
+import {
+  ArrowUpRight,
+  FileSpreadsheet,
+  LoaderCircle,
+  Server,
+  ShieldCheck,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { can } from '../auth/capabilities';
 import TallyImportPreview, { TABLE_NAME_HINT } from '../components/connect/TallyImportPreview';
 import HeaderRowPicker from '../components/connect/HeaderRowPicker';
+import SourceIllustration from '../components/connect/SourceIllustration';
 import BatchImport, {
   MAX_BATCH_FILES,
   TOO_MANY_FILES_MESSAGE,
@@ -59,6 +68,9 @@ export default function ConnectData() {
   const [uploadError, setUploadError] = useState('');
   const [isDragging, setIsDragging] = useState(false);
   const [createdWorkspace, setCreatedWorkspace] = useState(null);
+  const [uploadedFileCount, setUploadedFileCount] = useState(0);
+  // 'checking' while a file is only previewed, 'importing' once it is being saved.
+  const [uploadPhase, setUploadPhase] = useState('checking');
   const [importSummary, setImportSummary] = useState(null);
   const [tallyPreview, setTallyPreview] = useState(null);
   const [companyTarget, setCompanyTarget] = useState(null);
@@ -166,12 +178,13 @@ export default function ConnectData() {
     resetImport();
   };
 
-  const finishImport = (workspace, summary = null, existing = false) => {
+  const finishImport = (workspace, summary = null, existing = false, fileCount = 1) => {
     if (existing) updateWorkspace(workspace);
     else addWorkspace(workspace);
     setActiveWorkspaceId(workspace.id);
     setCreatedWorkspace(workspace);
     setImportSummary(summary);
+    setUploadedFileCount(fileCount);
     setAddedToCompany(existing);
     setSelectedFiles([]);
     setWorkspaceName('');
@@ -201,6 +214,7 @@ export default function ConnectData() {
   const changeTallyTarget = async (nextTarget) => {
     if (!tallyPreview) return;
     setCompanyTarget(nextTarget);
+    setUploadPhase('checking');
     setUploading(true);
     setUploadError('');
     try {
@@ -239,6 +253,7 @@ export default function ConnectData() {
   const confirmImport = async (fields) => {
     const file = tallyPreview?.file || headerPicker?.file;
     if (!file) return;
+    setUploadPhase('importing');
     setUploading(true);
     setUploadError('');
     try {
@@ -276,6 +291,7 @@ export default function ConnectData() {
       setUploadError(numbersError);
       return;
     }
+    setUploadPhase(selectedFiles.length === 1 ? 'checking' : 'importing');
     setUploading(true);
     setUploadError('');
     try {
@@ -298,6 +314,7 @@ export default function ConnectData() {
           return;
         }
       }
+      setUploadPhase('importing');
       const form = new FormData();
       const multiple = selectedFiles.length > 1;
       selectedFiles.forEach((file) => form.append(multiple ? 'files' : 'file', file));
@@ -307,7 +324,7 @@ export default function ConnectData() {
         multiple ? '/workspaces/upload-multiple' : '/workspaces/upload',
         { method: 'POST', body: form },
       );
-      finishImport(workspace, null, Boolean(targetId));
+      finishImport(workspace, null, Boolean(targetId), selectedFiles.length);
     } catch (error) {
       setUploadError(error.message || 'Upload failed');
     } finally {
@@ -366,6 +383,9 @@ export default function ConnectData() {
       addWorkspace(workspace);
       setActiveWorkspaceId(workspace.id);
       setCreatedWorkspace(workspace);
+      setUploadedFileCount(0);
+      setAddedToCompany(false);
+      setImportSummary(null);
       setServerForm({
         name: '',
         engine: 'postgresql',
@@ -433,6 +453,7 @@ export default function ConnectData() {
                 aria-selected={activeTab === 'upload'}
                 className={activeTab === 'upload' ? 'is-active' : ''}
                 onClick={() => setActiveTab('upload')}
+                disabled={uploading || connecting}
               >
                 <Upload size={15} /> Upload files
               </button>
@@ -442,6 +463,7 @@ export default function ConnectData() {
                 aria-selected={activeTab === 'server'}
                 className={activeTab === 'server' ? 'is-active' : ''}
                 onClick={() => setActiveTab('server')}
+                disabled={uploading || connecting}
               >
                 <Server size={15} /> Connect server
               </button>
@@ -458,19 +480,29 @@ export default function ConnectData() {
               />
             ) : createdWorkspace ? (
               <div className="connect-complete" role="status">
-                <div>
-                  <Check size={22} />
+                <div className="connect-complete-art">
+                  <SourceIllustration
+                    state="success"
+                    variant={createdWorkspace.source_type === 'server' ? 'link' : 'upload'}
+                    fileCount={uploadedFileCount}
+                  />
                 </div>
-                <span>{addedToCompany ? 'File added' : 'Company ready'}</span>
-                <h1>{createdWorkspace.name}</h1>
+                <h1>
+                  {createdWorkspace.source_type === 'server'
+                    ? 'Connection Successful'
+                    : 'Import Successful'}
+                </h1>
+                <p className="connect-complete-name">{createdWorkspace.name} · Workspace ready</p>
                 <p>
-                  {addedToCompany
-                    ? `The file is now part of ${createdWorkspace.name}${
-                        typeof createdWorkspace.file_count === 'number'
-                          ? `, which has ${createdWorkspace.file_count} file${createdWorkspace.file_count === 1 ? '' : 's'}`
-                          : ''
-                      }. Ask questions across all of them.`
-                    : 'Your source is now isolated and available for verified, read-only analysis.'}
+                  {createdWorkspace.source_type === 'server'
+                    ? 'Your source is now isolated and available for verified, read-only analysis.'
+                    : addedToCompany
+                      ? `${uploadedFileCount === 1 ? 'The file is' : `${uploadedFileCount} files are`} now part of ${createdWorkspace.name}${
+                          typeof createdWorkspace.file_count === 'number'
+                            ? `, which has ${createdWorkspace.file_count} file${createdWorkspace.file_count === 1 ? '' : 's'}`
+                            : ''
+                        }. Ask questions across all of them.`
+                      : `${uploadedFileCount} ${uploadedFileCount === 1 ? 'file' : 'files'} uploaded. Your source is now isolated and available for verified, read-only analysis.`}
                 </p>
                 {importSummary?.kind === 'tally' && (
                   <p className="connect-import-summary">
@@ -493,13 +525,7 @@ export default function ConnectData() {
               </div>
             ) : activeTab === 'upload' ? (
               <div className="connect-upload-flow">
-                <h1>Upload your data</h1>
-                <p>Upload CSV or Excel files, up to {MAX_BATCH_FILES} at once.</p>
-                <p className="connect-upload-note">
-                  Tally exports (XLSX or CSV) and plain spreadsheets are supported. Pick several
-                  files at once: each one gets a preview, you can cancel any of them, and the rest
-                  go into one company. Adding files never deletes what is already there.
-                </p>
+                <h1 className="connect-sr-only">Upload your data</h1>
                 {addMoreTo && targetCompany?.id === addMoreTo && (
                   <p className="connect-upload-note" role="status">
                     Choose more files for {targetCompany.name}. They are added next to the{' '}
@@ -523,33 +549,68 @@ export default function ConnectData() {
                 <label
                   htmlFor="fileUpload"
                   className={`connect-dropzone${isDragging ? ' is-dragging' : ''}${uploading ? ' is-uploading' : ''}`}
+                  aria-busy={uploading}
                   onDragOver={(event) => {
                     event.preventDefault();
-                    setIsDragging(true);
+                    if (!uploading) setIsDragging(true);
                   }}
-                  onDragLeave={() => setIsDragging(false)}
+                  onDragLeave={(event) => {
+                    if (!event.currentTarget.contains(event.relatedTarget)) setIsDragging(false);
+                  }}
                   onDrop={(event) => {
                     event.preventDefault();
                     setIsDragging(false);
                     selectFiles(event.dataTransfer.files);
                   }}
                 >
-                  <div className="connect-dropzone-mark">
-                    <Upload size={23} />
-                  </div>
-                  <strong>
+                  <SourceIllustration
+                    state={uploading ? 'uploading' : 'idle'}
+                    phase={uploadPhase}
+                    fileCount={selectedFiles.length}
+                  />
+                  <strong className="connect-upload-title">
+                    {uploading && (
+                      <LoaderCircle
+                        size={20}
+                        className="connect-upload-spinner"
+                        aria-hidden="true"
+                      />
+                    )}
                     {uploading
-                      ? 'Checking your file…'
+                      ? uploadPhase === 'importing'
+                        ? 'Importing your file…'
+                        : 'Checking your file…'
                       : selectedFiles.length
                         ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected`
-                        : 'Drop files here'}
+                        : 'Upload Files'}
                   </strong>
-                  <span>
-                    {uploading
-                      ? 'Validating structure and access boundaries'
-                      : 'or browse from your device'}
+                  <span className="connect-dropzone-description">
+                    {uploading ? (
+                      'Validating your data and preparing your workspace'
+                    ) : (
+                      <>
+                        Drag and drop your files here, or <b>click to select.</b>
+                      </>
+                    )}
                   </span>
+                  <span className="connect-dropzone-formats">Supported formats: .xlsx, .csv</span>
                 </label>
+                <p className="connect-sr-only" role="status">
+                  {uploading
+                    ? uploadPhase === 'importing'
+                      ? 'Importing your file'
+                      : 'Checking your file'
+                    : ''}
+                </p>
+
+                <p className="connect-upload-note">
+                  Upload CSV or Excel files, up to {MAX_BATCH_FILES} at once.
+                </p>
+                <p className="connect-upload-note">
+                  Tally exports (XLSX or CSV) and plain spreadsheets are supported. Each file gets a
+                  preview; you can cancel individual files and save the rest into one company.
+                  Adding files never deletes existing data.
+                </p>
 
                 {tallyPreview && (
                   <TallyImportPreview
@@ -643,6 +704,9 @@ export default function ConnectData() {
               </div>
             ) : (
               <form className="connect-server-form" onSubmit={connectServer} noValidate>
+                <div className="connect-server-art">
+                  <SourceIllustration variant="link" state={connecting ? 'uploading' : 'idle'} />
+                </div>
                 <h1>Connect your database</h1>
                 <p>Link PostgreSQL or MySQL using a read-only database user.</p>
                 <div className="connect-server-grid">
