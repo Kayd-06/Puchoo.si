@@ -2,7 +2,12 @@ import { useId } from 'react';
 import '../../styles/sourceIllustration.css';
 
 // Decorative art follows real request state; it never simulates progress or row counts.
-export default function SourceIllustration({ state = 'idle', variant = 'upload', fileCount = 0 }) {
+export default function SourceIllustration({
+  state = 'idle',
+  variant = 'upload',
+  fileCount = 0,
+  phase = 'importing',
+}) {
   const id = useId().replace(/:/g, '');
   const paint = (name) => `url(#${id}-${name})`;
   return (
@@ -189,7 +194,7 @@ export default function SourceIllustration({ state = 'idle', variant = 'upload',
               opacity=".7"
             />
             <text x="104" y="190" className="source-folder-label">
-              {state === 'success' ? 'Imported' : 'Importing'}
+              {state === 'success' ? 'Imported' : phase === 'checking' ? 'Checking' : 'Importing'}
             </text>
             <g clipPath={paint('count-window')}>
               {state === 'success' ? (

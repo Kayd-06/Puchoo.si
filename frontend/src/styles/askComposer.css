@@ -393,7 +393,8 @@ html[data-theme='light'] #root .app-container .ask-page {
   padding-bottom: 16px;
 }
 #root .app-container .ask-page.has-result .ask-stage-footer {
-  display: none;
+  margin-top: 4px;
+  padding-block: 0;
 }
 #root .app-container .ask-page.has-result .ask-chat-actions {
   margin-block: 0;

@@ -304,7 +304,6 @@ export function queryUniversePalette(theme) {
 export function QueryUniverse() {
   const canvasRef = useRef(null);
   const pointerRef = useRef({ x: 0, y: 0, active: false });
-  const lightRenderer = paintLightDataField;
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -438,7 +437,7 @@ export function QueryUniverse() {
       const centerX = width / 2;
       const centerY = height * 0.58;
       if (document.documentElement.dataset.theme === 'light') {
-        lightRenderer(context, {
+        paintLightDataField(context, {
           width,
           height,
           time,
@@ -648,7 +647,7 @@ export function QueryUniverse() {
       canvas.width = canvas.height = 0;
       context = null;
     };
-  }, [lightRenderer]);
+  }, []);
 
   return <canvas ref={canvasRef} className="ask-universe" aria-hidden="true" />;
 }
@@ -1547,7 +1546,8 @@ export default function AskData() {
             </div>
           )}
 
-          {loading && <ResultGenerationPreview />}
+          {/* A rerun inside a multi-question answer keeps the other answers in place. */}
+          {loading && !result && analyses.length === 0 && <ResultGenerationPreview />}
 
           {analyses.length > 1 && (
             <section
